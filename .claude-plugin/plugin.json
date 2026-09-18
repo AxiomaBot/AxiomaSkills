@@ -1,0 +1,8 @@
+{
+  "name": "agentic-workflow",
+  "description": "Per-feature, trunk-based agentic build workflow: roadmap and chunk planning, unattended build, fresh diff-only PR review (quality + security), and a retro that defaults to no change.",
+  "version": "0.1.0",
+  "author": {
+    "name": "AxiomaBot"
+  }
+}
