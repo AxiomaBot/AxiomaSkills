@@ -1,0 +1,232 @@
+name: PR guards (secrets, permissions & review coverage)
+
+# Cheap, always-on deterministic floor. secret-scan and
+# no-committed-permission-grants cover the two classes the Claude PR reviews
+# (agents/{quality,security}-reviewer.md, run in-session by the pr-review
+# skill) are least suited to catch reliably in a *diff-only* pass: a
+# committed secret (e.g. a session cookie left in a test doc) and a committed
+# agent permission grant (e.g. a side-effecting tool auto-approved in
+# `.claude/settings.local.json`). review-coverage covers a different gap:
+# those in-session reviews are agent-invoked, not GitHub-triggered
+# (AGENTS.md → "Claude review fixes" — nothing on GitHub's side forces the
+# pr-review skill to run, so a push nobody reviews is a real gap). AGENTS.md's
+# own policy is that every head gets both reviews, no path-based skip,
+# plan-only and docs-only PRs included — this job is what makes an unreviewed
+# head visible instead of silently unblocked.
+#
+# All three jobs run on EVERY PR (no `paths-ignore`) — they are the floor.
+
+on:
+  pull_request:
+    branches: [main]
+    # Must include `ready_for_review`: the jobs skip drafts, so without it a
+    # PR opened as draft and later marked ready (with no intervening push)
+    # would never run this floor. Every head still gets both Claude reviews
+    # regardless of file type — no doc-only skip (see the header above).
+    types: [opened, synchronize, reopened, ready_for_review]
+  issue_comment:
+    # So posting a review comment turns review-coverage green without a new
+    # push — a comment is not a push and shouldn't need to look like one.
+    types: [created]
+
+permissions:
+  contents: read
+
+concurrency:
+  # issue_comment carries no `pull_request` object — only `issue.number` (the
+  # PR, addressed as an issue). Falls back to whichever the trigger provides.
+  # Keyed on event_name too: without it, a review comment landing while a
+  # push-triggered secret-scan/permission-grants run is still in flight would
+  # cancel that whole run via cancel-in-progress, stranding those two checks
+  # cancelled with nothing to re-trigger just them until the next push.
+  group: pr-guards-${{ github.event_name }}-${{ github.event.pull_request.number || github.event.issue.number }}
+  cancel-in-progress: true
+
+jobs:
+  secret-scan:
+    name: Secret scan (gitleaks)
+    runs-on: ubuntu-latest
+    # pull_request-only: needs the actual diff, which issue_comment doesn't carry.
+    if: github.event_name == 'pull_request' && github.event.pull_request.draft == false
+    steps:
+      - name: Checkout (full history for the PR range)
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Install gitleaks
+        env:
+          # Pinned for determinism: a required check must not depend on the
+          # unauthenticated "latest release" API (rate limits / upstream
+          # changes could fail unrelated PRs). Bump deliberately.
+          GITLEAKS_VERSION: "8.30.1"
+        run: |
+          set -euo pipefail
+          curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz" \
+            | tar -xzf - gitleaks
+          sudo install gitleaks /usr/local/bin/gitleaks
+          gitleaks version
+
+      - name: Scan the PR's commits for secrets
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          # Scan only the commits this PR adds (base..head), not repo history, so
+          # a clean PR is never blocked by anything already on main.
+          gitleaks detect --redact -v --log-opts="${BASE_SHA}..${HEAD_SHA}"
+
+  no-committed-permission-grants:
+    name: No committed permission grants
+    runs-on: ubuntu-latest
+    # pull_request-only: needs the actual diff, which issue_comment doesn't carry.
+    if: github.event_name == 'pull_request' && github.event.pull_request.draft == false
+    steps:
+      - name: Checkout (full history to diff against base)
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Fail on new allow-list entries in any tracked settings file
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        # The guard enumerates every tracked .claude/settings*.json (base ∪
+        # head) so a newly-added settings file can't slip a grant past it. Logic
+        # lives in a script so it is unit-tested (tests/test_permission_grant_guard.py).
+        run: bash scripts/check_committed_permission_grants.sh "$BASE_SHA"
+
+  review-coverage:
+    name: Review coverage
+    runs-on: ubuntu-latest
+    # Runs for a normal PR trigger, or a comment on an issue that is actually
+    # a PR (issue_comment fires for both; plain-issue comments are excluded
+    # here rather than relying on a later step, since gh CLI calls below
+    # assume a PR exists).
+    if: github.event_name == 'pull_request' || (github.event_name == 'issue_comment' && github.event.issue.pull_request != null)
+    permissions:
+      contents: read
+      pull-requests: read
+      issues: read
+      checks: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      # Resolved before checkout: the PR's real head SHA is what gets checked
+      # out below, for both trigger types. GITHUB_SHA/GITHUB_REF are unusable
+      # for this — a pull_request event points at a synthetic merge ref, and
+      # an issue_comment event points at the default branch's tip, not the
+      # PR's — so `gh pr view` is the source of truth for both.
+      - name: Resolve PR head SHA and draft status
+        id: pr
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number || github.event.issue.number }}
+          # This step runs before checkout, so there is no git repository for
+          # gh to infer the target from — without GH_REPO every `gh pr view`
+          # died with "not a git repository" on both trigger paths (first seen
+          # on PR #118, the first PR after this job merged).
+          GH_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          info="$(gh pr view "$PR_NUMBER" --json headRefOid,isDraft)"
+          echo "head_sha=$(jq -r '.headRefOid' <<<"$info")" >> "$GITHUB_OUTPUT"
+          echo "is_draft=$(jq -r '.isDraft' <<<"$info")" >> "$GITHUB_OUTPUT"
+          echo "pr_number=$PR_NUMBER" >> "$GITHUB_OUTPUT"
+
+      # SECURITY: always check out the base branch here, never the PR's own
+      # head. This job runs with `checks: write`, and on the `issue_comment`
+      # trigger that runs in the BASE repository's context with a fully
+      # privileged token even for a PR opened by an outside contributor —
+      # unlike `pull_request`, there is no automatic read-only downgrade for
+      # a fork. Checking out and then executing a script FROM THE PR HEAD in
+      # that context — as an earlier version of this workflow did — is the
+      # `pull_request_target` privilege-escalation anti-pattern reached via
+      # `issue_comment` instead of the named event: anyone who can open a PR
+      # and comment on it could run arbitrary code with a `checks: write`
+      # token. The script below needs no content from the PR itself — only
+      # the head SHA (a string, resolved above) and comments fetched over the
+      # API — so the base branch's own trusted copy is always sufficient.
+      #
+      # One-time bootstrap caveat: the very first PR that adds this workflow
+      # (and scripts/check_review_coverage.sh) to a project runs before
+      # either exists on the base branch. The "Check both reviews" step below
+      # detects that and reports "not yet available" rather than falling back
+      # to the PR's own copy — land that first PR by a route this job does
+      # not gate (a direct push, or accept one red check once), same as any
+      # other bootstrap.
+      - name: Checkout (base branch only — never the PR head)
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+
+      # Never interpolate a comment body into a shell command — fetch the raw
+      # comments as JSON and let jq (structured, not string-substituted) do
+      # every bit of the filtering. This is a visibility aid, not an
+      # authentication check: it only proves a comment from an accepted
+      # author carrying the marker text exists, on the assumption that this
+      # is a private repo where only the project's own people and their
+      # agent sessions can comment (the `pr-review` skill's own trust note
+      # makes the same assumption). `OWNER` alone is not enough on an
+      # org-owned repo — an org's own members and collaborators show as
+      # `MEMBER`/`COLLABORATOR`, never `OWNER`, so this accepts all three; a
+      # project with outside contributors needs a narrower list.
+      - name: Fetch accepted-author PR comments
+        if: steps.pr.outputs.is_draft != 'true'
+        env:
+          PR_NUMBER: ${{ steps.pr.outputs.pr_number }}
+        run: |
+          set -euo pipefail
+          gh api --paginate "repos/${{ github.repository }}/issues/${PR_NUMBER}/comments" \
+            | jq -s '[.[][] | select(.author_association == "OWNER" or .author_association == "MEMBER" or .author_association == "COLLABORATOR") | {body}]' \
+            > owner_comments.json
+
+      - name: Check both reviews are posted for the current head
+        id: check
+        if: steps.pr.outputs.is_draft != 'true'
+        continue-on-error: true
+        env:
+          HEAD_SHA: ${{ steps.pr.outputs.head_sha }}
+        run: |
+          set -euo pipefail
+          if [ ! -f scripts/check_review_coverage.sh ]; then
+            echo "scripts/check_review_coverage.sh isn't on the base branch yet (expected only for the PR that first adds this workflow) — nothing to check yet." >&2
+            exit 1
+          fi
+          bash scripts/check_review_coverage.sh "$HEAD_SHA" owner_comments.json
+
+      # GitHub attaches an issue_comment-triggered run's own native pass/fail
+      # status to the default branch's SHA, not the PR's — so relying on it
+      # would make this job invisible on the PR's checks list every time a
+      # review comment is what triggered the run, defeating the whole reason
+      # for the issue_comment trigger (turning green when a review posts,
+      # without a new push). Report explicitly against the real head SHA via
+      # the Checks API instead, uniformly for both trigger types, rather than
+      # trusting the run's own event-dependent auto-attached status.
+      #
+      # This step deliberately always exits 0. An earlier version ended with
+      # `[ "$CONCLUSION" = "success" ]`, which re-coupled this *job's own*
+      # native run status to the coverage result — exactly what the paragraph
+      # above says not to trust. In practice that meant every PR's first
+      # `pull_request`-triggered run (before any review comment can possibly
+      # exist yet) always failed natively, leaving a permanently-red "Review
+      # coverage (pull_request)" entry in the checks list even once a later
+      # `issue_comment`-triggered run posted a passing custom check-run for
+      # the same head — confusing both humans and agents into thinking the
+      # PR was still blocked (seen repeatedly, e.g. PR #122). The custom
+      # check-run posted above is the sole source of truth for pass/fail;
+      # this job's own status only needs to reflect "did the check attempt
+      # run to completion," which it did by the time this line is reached.
+      - name: Report the check against the PR's actual head SHA
+        if: steps.pr.outputs.is_draft != 'true'
+        env:
+          HEAD_SHA: ${{ steps.pr.outputs.head_sha }}
+          CONCLUSION: ${{ steps.check.outcome == 'success' && 'success' || 'failure' }}
+        run: |
+          set -euo pipefail
+          gh api "repos/${{ github.repository }}/check-runs" \
+            -f name="Review coverage" \
+            -f head_sha="$HEAD_SHA" \
+            -f status="completed" \
+            -f conclusion="$CONCLUSION" \
+            > /dev/null
+          echo "Reported Review coverage=$CONCLUSION for head $HEAD_SHA."

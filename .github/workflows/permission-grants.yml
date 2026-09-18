@@ -1,0 +1,31 @@
+name: No committed permission grants
+
+# This plugin can ship its own permission surface (a bundled skill or agent
+# could carry a committed `.claude/settings*.json`), so it carries the same
+# deterministic guard the projects that consume it do: a committed
+# auto-approve is a standing grant for every future session, and belongs in
+# untracked local config, never in the repo.
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+
+jobs:
+  no-committed-permission-grants:
+    name: No committed permission grants
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.draft == false
+    steps:
+      - name: Checkout (full history to diff against base)
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Fail on new allow-list entries in any tracked settings file
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: bash scripts/check_committed_permission_grants.sh "$BASE_SHA"

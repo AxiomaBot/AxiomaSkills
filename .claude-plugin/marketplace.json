@@ -1,0 +1,17 @@
+{
+  "name": "axioma-skills",
+  "owner": {
+    "name": "AxiomaBot"
+  },
+  "plugins": [
+    {
+      "name": "agentic-workflow",
+      "description": "Per-feature, trunk-based agentic build workflow: roadmap and chunk planning, unattended build, fresh diff-only PR review (quality + security), and a retro that defaults to no change.",
+      "source": {
+        "source": "github",
+        "repo": "AxiomaBot/AxiomaSkills",
+        "ref": "main"
+      }
+    }
+  ]
+}
