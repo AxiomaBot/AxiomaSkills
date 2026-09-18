@@ -1,0 +1,58 @@
+name: CI
+
+# The two bundled scripts are what the `workflow` and `pr-review` skills
+# actually execute inside every consuming project, so they are the one part of
+# this repo that can break someone else's build silently. They are stdlib-only,
+# so this needs no lockfile — just pytest and ruff.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    name: Code Quality
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - run: pip install ruff==0.15.22
+
+      - run: ruff check .
+
+      - run: ruff format --check .
+
+  test:
+    name: Tests
+    runs-on: ubuntu-latest
+    needs: quality
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - run: pip install pytest==8.4.2
+
+      # Covers both bundled scripts, and — through the layout check running
+      # against `fixture/` — that the shipped fixture project still satisfies
+      # the contract the skills read it against.
+      - run: pytest -q

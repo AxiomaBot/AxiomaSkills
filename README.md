@@ -552,10 +552,15 @@ The skill files *are* the method, so treat an edit to one as a change to a
 contract rather than to prose:
 
 1. Make the edit.
-2. Prove the layout contract still holds:
-   `python skills/workflow/scripts/workflow_check.py --root fixture` — exit 0.
+2. Run the tests: `pytest` (needs only pytest — both bundled scripts are
+   stdlib-only). They cover the two scripts the skills execute, and one of
+   them runs the layout check against `fixture/`, so a break in either the
+   checker or the fixture fails here. CI runs the same thing on every PR.
 3. Run the skill you changed against `fixture/` in a session started with
    `claude --plugin-dir /path/to/AxiomaSkills`. See
    [fixture/README.md](fixture/README.md).
 4. A rule that turns out to be wrong is a change to the script or the skill
    that owns it, in its own PR — never a workaround in the file it checks.
+5. **Bump `version` in `.claude-plugin/plugin.json`.** A consuming project
+   moves its pin to your new commit, and the cache is keyed by version — skip
+   the bump and every machine keeps running the old content.
