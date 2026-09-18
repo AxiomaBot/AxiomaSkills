@@ -1,0 +1,15 @@
+# This repo ships no Python package — it is a Claude Code plugin. The two
+# bundled scripts are stdlib-only and are run by path, not imported. This file
+# exists only to configure the tools that check them.
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 88
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP"]
+
+[tool.ruff.format]
+quote-style = "double"
