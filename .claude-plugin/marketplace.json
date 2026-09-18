@@ -1,5 +1,6 @@
 {
   "name": "axioma-skills",
+  "description": "Self-developed agentic coding skills, starting with the agentic-workflow build/review/retro plugin.",
   "owner": {
     "name": "AxiomaBot"
   },
