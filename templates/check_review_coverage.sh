@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Fail if the given head SHA has no owner-authored PR comment carrying
+# Fail if the given head SHA has no accepted-author PR comment carrying
 # `Reviewed head: <sha>` under both `# Code quality review` and
 # `# Security review verdict`.
 #

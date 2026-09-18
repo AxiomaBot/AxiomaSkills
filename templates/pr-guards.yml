@@ -133,39 +133,51 @@ jobs:
           echo "is_draft=$(jq -r '.isDraft' <<<"$info")" >> "$GITHUB_OUTPUT"
           echo "pr_number=$PR_NUMBER" >> "$GITHUB_OUTPUT"
 
-      # Pinned to the PR's own resolved head SHA (not a bare ref override) so
-      # both trigger types check out the identical commit: a pull_request
-      # event's default checkout would give the synthetic merge-preview ref,
-      # and an issue_comment event's default would give the default branch's
-      # tip — neither is the PR's own scripts/check_review_coverage.sh. Before
-      # this fix, an issue_comment-triggered run checked out `main`, where a
-      # script a PR adds or changes doesn't exist yet; round 3's review caught
-      # this failing exactly that way on this PR's own comments. Checking out
-      # the PR's own head on both paths does mean this job trusts
-      # scripts/check_review_coverage.sh as the PR under review itself defines
-      # it — a self-check a compromised PR could rewrite. Accepted for now
-      # given the single-owner threat model (see docs/deferred.md).
-      - name: Checkout
+      # SECURITY: always check out the base branch here, never the PR's own
+      # head. This job runs with `checks: write`, and on the `issue_comment`
+      # trigger that runs in the BASE repository's context with a fully
+      # privileged token even for a PR opened by an outside contributor —
+      # unlike `pull_request`, there is no automatic read-only downgrade for
+      # a fork. Checking out and then executing a script FROM THE PR HEAD in
+      # that context — as an earlier version of this workflow did — is the
+      # `pull_request_target` privilege-escalation anti-pattern reached via
+      # `issue_comment` instead of the named event: anyone who can open a PR
+      # and comment on it could run arbitrary code with a `checks: write`
+      # token. The script below needs no content from the PR itself — only
+      # the head SHA (a string, resolved above) and comments fetched over the
+      # API — so the base branch's own trusted copy is always sufficient.
+      #
+      # One-time bootstrap caveat: the very first PR that adds this workflow
+      # (and scripts/check_review_coverage.sh) to a project runs before
+      # either exists on the base branch. The "Check both reviews" step below
+      # detects that and reports "not yet available" rather than falling back
+      # to the PR's own copy — land that first PR by a route this job does
+      # not gate (a direct push, or accept one red check once), same as any
+      # other bootstrap.
+      - name: Checkout (base branch only — never the PR head)
         uses: actions/checkout@v7
         with:
-          ref: ${{ steps.pr.outputs.head_sha }}
+          ref: ${{ github.event.repository.default_branch }}
 
       # Never interpolate a comment body into a shell command — fetch the raw
       # comments as JSON and let jq (structured, not string-substituted) do
       # every bit of the filtering. This is a visibility aid, not an
-      # authentication check: it only proves *an owner-authored* comment
-      # carrying the marker text exists, the same trust boundary the rest of
-      # this repo already relies on for posted review comments (pr-review.md
-      # § "Trust note" — on this private repo, only the owner and their agent
-      # sessions can comment).
-      - name: Fetch owner-authored PR comments
+      # authentication check: it only proves a comment from an accepted
+      # author carrying the marker text exists, on the assumption that this
+      # is a private repo where only the project's own people and their
+      # agent sessions can comment (the `pr-review` skill's own trust note
+      # makes the same assumption). `OWNER` alone is not enough on an
+      # org-owned repo — an org's own members and collaborators show as
+      # `MEMBER`/`COLLABORATOR`, never `OWNER`, so this accepts all three; a
+      # project with outside contributors needs a narrower list.
+      - name: Fetch accepted-author PR comments
         if: steps.pr.outputs.is_draft != 'true'
         env:
           PR_NUMBER: ${{ steps.pr.outputs.pr_number }}
         run: |
           set -euo pipefail
           gh api --paginate "repos/${{ github.repository }}/issues/${PR_NUMBER}/comments" \
-            | jq -s '[.[][] | select(.author_association == "OWNER") | {body}]' \
+            | jq -s '[.[][] | select(.author_association == "OWNER" or .author_association == "MEMBER" or .author_association == "COLLABORATOR") | {body}]' \
             > owner_comments.json
 
       - name: Check both reviews are posted for the current head
@@ -174,7 +186,13 @@ jobs:
         continue-on-error: true
         env:
           HEAD_SHA: ${{ steps.pr.outputs.head_sha }}
-        run: bash scripts/check_review_coverage.sh "$HEAD_SHA" owner_comments.json
+        run: |
+          set -euo pipefail
+          if [ ! -f scripts/check_review_coverage.sh ]; then
+            echo "scripts/check_review_coverage.sh isn't on the base branch yet (expected only for the PR that first adds this workflow) — nothing to check yet." >&2
+            exit 1
+          fi
+          bash scripts/check_review_coverage.sh "$HEAD_SHA" owner_comments.json
 
       # GitHub attaches an issue_comment-triggered run's own native pass/fail
       # status to the default branch's SHA, not the PR's — so relying on it
