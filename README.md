@@ -135,76 +135,79 @@ The rule this plugin came out of: a project pins the plugin to a **commit
 SHA, not a branch**, so a skill edit never silently changes how a build
 behaves mid-feature.
 
-Claude Code pins a plugin through a *marketplace* entry. A marketplace is a
-repository carrying `.claude-plugin/marketplace.json`; a plugin entry inside
-it may set `sha`, and when it does, that commit is what gets checked out.
+Claude Code pins a plugin through a *marketplace* entry: a plugin entry whose
+`source` carries a `sha` is fetched at that commit. **The consuming project
+has to own that marketplace file** — pinning is not something this repo can
+do on a consumer's behalf, and it is not something the consumer can override
+from its settings (see the traps below).
 
-> **Status, honestly:** this repository now carries
-> `.claude-plugin/marketplace.json` (below), with `ref: main` — floating, not
-> pinned. Neither that file nor the `sha`-pinned install path below has been
-> exercised end to end from a real consuming project yet; that happens when
-> a project actually installs this plugin, which is when the exact commit to
-> pin gets decided. The `--plugin-dir` path above is what is verified today.
-
-The marketplace file this repo carries — one plugin, sourced from the repo it
-lives in:
+So a project that wants a pin ships its own small marketplace file, listing
+this plugin at the commit it wants. In the project, `.claude-plugin/marketplace.json`:
 
 ```json
 {
-  "name": "axioma-skills",
-  "owner": { "name": "AxiomaBot" },
+  "name": "<project>-pins",
+  "description": "Pinned external plugins for this project.",
+  "owner": { "name": "<you>" },
   "plugins": [
     {
       "name": "agentic-workflow",
+      "description": "Pinned build/review/retro workflow plugin.",
       "source": {
         "source": "github",
         "repo": "AxiomaBot/AxiomaSkills",
-        "ref": "main"
+        "sha": "<40-character commit SHA>"
       }
     }
   ]
 }
 ```
 
-A consuming project that wants a **hard pin** rather than the floating `ref`
-adds its own marketplace entry for the same plugin with `sha` instead of
-`ref` — either in a marketplace file it controls, or (undocumented from this
-repo, to be confirmed when a project actually does this) an override in its
-own `.claude/settings.json`. Don't assume the shape below is exact until
-that's been done once for real:
-
-```json
-{
-  "source": {
-    "source": "github",
-    "repo": "AxiomaBot/AxiomaSkills",
-    "sha": "<40-character commit SHA>"
-  }
-}
-```
-
-Then, in the consuming project's `.claude/settings.json`:
+and in the project's `.claude/settings.json`:
 
 ```json
 {
   "extraKnownMarketplaces": {
-    "axioma-skills": {
-      "source": { "source": "github", "repo": "AxiomaBot/AxiomaSkills" }
+    "<project>-pins": {
+      "source": { "source": "file", "path": "./.claude-plugin/marketplace.json" }
     }
   },
-  "enabledPlugins": { "agentic-workflow@axioma-skills": true }
+  "enabledPlugins": { "agentic-workflow@<project>-pins": true }
 }
 ```
 
-and install it once per machine:
+Install it once per machine:
 
 ```shell
-/plugin install agentic-workflow@axioma-skills
+claude plugin install agentic-workflow@<project>-pins --scope project
 ```
 
-Bumping the plugin in a project is then a one-line PR: change the `sha`. A
-private repository works as a marketplace as long as the machine's git
-credentials can clone it.
+A private repository works as a marketplace as long as the machine's git
+credentials can clone it. Keep the marketplace path **relative** — an
+absolute one is what `claude plugin marketplace add` writes by default, and
+it breaks for everyone else and in CI.
+
+This repo also carries its own `.claude-plugin/marketplace.json` listing the
+plugin at `ref: main`, so `claude plugin marketplace add AxiomaBot/AxiomaSkills`
+gives you a floating install in one step. That is for trying the plugin out,
+not for a project building against it — a floating install is exactly what
+the pin above exists to avoid.
+
+> **Two traps, both found by pinning this for real rather than by reading
+> the docs.** Neither reports an error.
+>
+> 1. **`sha` on a marketplace's own source, in `extraKnownMarketplaces`, is
+>    silently ignored.** Pinning there and running `claude plugin marketplace
+>    update` prints "Successfully updated" and checks out the default branch's
+>    tip regardless. The pin only does anything on a *plugin entry's* source,
+>    which is why the consumer has to own the marketplace file. A project that
+>    puts the `sha` in settings believes it is pinned and is not.
+> 2. **The plugin cache is keyed by `version`, not by commit.** Bumping only
+>    the `sha` leaves every machine serving the old commit's content, and
+>    `claude plugin update` answers "already at the latest version (x.y.z)"
+>    and does nothing. **So every release here bumps `version` in
+>    `.claude-plugin/plugin.json`**, and bumping a project's pin means moving
+>    the `sha` to a commit whose version differs from the one it is on.
 
 `enabledPlugins` and `extraKnownMarketplaces` are ordinary settings, not
 permission grants — and note that this workflow treats a committed
