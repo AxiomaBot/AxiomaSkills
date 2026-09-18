@@ -68,7 +68,10 @@ the chunk has no runtime surface.
 
 ## Finish
 
-1. Commit (conventional commits; `CLAUDE.md` → Commit conventions).
+1. Commit with conventional commits, unless this project states its own
+   convention in `CLAUDE.md` or `AGENTS.md` — then follow that. Neither the
+   `workflow` skill's `init` nor its `check` requires a commit-convention
+   section, so never treat one as guaranteed to be there.
 2. Run the `handoff` skill for `<feature> <chunk>` — it folds the Manual test
    steps into the feature checklist, ticks the boxes and sets the status.
    Commit its edits.
