@@ -16,8 +16,12 @@ all of that; `init` writes the skeleton `check` expects.
 
 ## `check`
 
+Run with the project's own Python (see `CLAUDE.md` → Commands — e.g.
+`poetry run python`, `uv run python`, or plain `python3`; the script is
+stdlib-only):
+
 ```bash
-poetry run python ${CLAUDE_PLUGIN_ROOT}/skills/workflow/scripts/workflow_check.py
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/workflow/scripts/workflow_check.py
 ```
 
 Exit 0 means every rule held. Otherwise each line is `<file>: <what>` —

@@ -139,13 +139,14 @@ Claude Code pins a plugin through a *marketplace* entry. A marketplace is a
 repository carrying `.claude-plugin/marketplace.json`; a plugin entry inside
 it may set `sha`, and when it does, that commit is what gets checked out.
 
-> **Status, honestly:** this repository does **not** yet carry a
-> `.claude-plugin/marketplace.json`, so it cannot be added as a marketplace as
-> it stands. The rest of this subsection describes the documented shape, not
-> something exercised from this repo. The `--plugin-dir` path above is what
-> works today.
+> **Status, honestly:** this repository now carries
+> `.claude-plugin/marketplace.json` (below), with `ref: main` — floating, not
+> pinned. Neither that file nor the `sha`-pinned install path below has been
+> exercised end to end from a real consuming project yet; that happens when
+> a project actually installs this plugin, which is when the exact commit to
+> pin gets decided. The `--plugin-dir` path above is what is verified today.
 
-The marketplace file this repo needs — one plugin, sourced from the repo it
+The marketplace file this repo carries — one plugin, sourced from the repo it
 lives in:
 
 ```json
@@ -158,10 +159,27 @@ lives in:
       "source": {
         "source": "github",
         "repo": "AxiomaBot/AxiomaSkills",
-        "sha": "<40-character commit SHA>"
+        "ref": "main"
       }
     }
   ]
+}
+```
+
+A consuming project that wants a **hard pin** rather than the floating `ref`
+adds its own marketplace entry for the same plugin with `sha` instead of
+`ref` — either in a marketplace file it controls, or (undocumented from this
+repo, to be confirmed when a project actually does this) an override in its
+own `.claude/settings.json`. Don't assume the shape below is exact until
+that's been done once for real:
+
+```json
+{
+  "source": {
+    "source": "github",
+    "repo": "AxiomaBot/AxiomaSkills",
+    "sha": "<40-character commit SHA>"
+  }
 }
 ```
 

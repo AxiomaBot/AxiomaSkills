@@ -40,8 +40,12 @@ pre-PR on a pushed branch; in that mode skip step 4.
 
 ## 2. Build the compact diff context
 
+Run with the project's own Python (see `CLAUDE.md` → Commands — e.g.
+`poetry run python`, `uv run python`, or plain `python3`; the script is
+stdlib-only):
+
 ```bash
-poetry run python ${CLAUDE_PLUGIN_ROOT}/skills/pr-review/scripts/review_context.py --out-dir <dir outside the worktree>
+python3 ${CLAUDE_PLUGIN_ROOT}/skills/pr-review/scripts/review_context.py --out-dir <dir outside the worktree>
 ```
 
 (Add `--base-ref <branch>` for a PR that targets anything other than `main`.)

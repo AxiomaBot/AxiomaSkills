@@ -1,7 +1,7 @@
 Three `##` headings for the project's `AGENTS.md`, each read by name by a
-skill or a reviewer agent. `/workflow init` writes this skeleton; the content
-under each heading is the project's own and grows over time — nothing here
-is copied from another project.
+skill or a reviewer agent. The `workflow` skill's `init` mode writes this
+skeleton; the content under each heading is the project's own and grows over
+time — nothing here is copied from another project.
 
 ```markdown
 ## Domain rules for code review
@@ -34,6 +34,6 @@ must hold to — the game rules, not implementation notes.
 ## Weak spots
 
 The repo-specific classes of mistake that have recurred here live in
-`docs/weak-spots.md`, written **only** by `/retro`. Both reviewer agents and
-`/build`'s self-review read it from there.
+`docs/weak-spots.md`, written **only** by the `retro` skill. Both reviewer
+agents and the `build` skill's self-review read it from there.
 ```
