@@ -85,9 +85,8 @@ Then, in order:
    plugin. Read it; never retype it from memory or from the README, which
    deliberately does not reproduce it. Changing a floor is an edit to that
    one file, plus `TIERS` in this skill's own check script when a tier is
-   renamed — and `tests/test_bundled_copies.py` pins the two together, and
-   pins `fixture/`'s `## Models` to the template as well, so a missed copy
-   fails CI by name rather than drifting.
+   renamed. This plugin's own repo pins the two together in CI, so a missed
+   copy fails by name rather than drifting.
 
 3. Install the whole `pr-guards.yml` from
    `${CLAUDE_PLUGIN_ROOT}/templates/pr-guards.yml` to

@@ -13,7 +13,7 @@ the *workflow* skills, not a build.
 **1. The layout check, from the plugin repo root:**
 
 ```bash
-python skills/workflow/scripts/workflow_check.py --root fixture
+python plugins/agentic-workflow/skills/workflow/scripts/workflow_check.py --root fixture
 ```
 
 Exit 0 and `workflow check: OK` is the expected result on a clean checkout.
@@ -23,7 +23,8 @@ uses to run Python (`poetry run`, `uv run`, or nothing).
 
 **2. The skill you actually changed.** Open a Claude Code session with its
 working directory set to `fixture/` and this plugin loaded — during
-development that is `claude --plugin-dir /path/to/AxiomaSkills` — then invoke
+development that is
+`claude --plugin-dir /path/to/AxiomaSkills/plugins/agentic-workflow` — then invoke
 the skill by its namespaced name and watch what it writes:
 
 ```shell

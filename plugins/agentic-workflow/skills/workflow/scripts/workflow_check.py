@@ -47,7 +47,7 @@ Exit status is 0 when nothing fails, 1 otherwise. Each finding is one line,
 
 Usage::
 
-    python scripts/workflow_check.py [--root <repo>]
+    python skills/workflow/scripts/workflow_check.py [--root <repo>]
 """
 
 from __future__ import annotations

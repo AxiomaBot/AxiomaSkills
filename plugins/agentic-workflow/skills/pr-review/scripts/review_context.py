@@ -75,7 +75,7 @@ a dependency change is security-relevant and allocation bounds any one of them
 without starving the rest. **The archive files** under ``docs/archive/`` stay
 in too: excluding them was tried and reverted, because a ``/handoff`` reopen
 legitimately deletes a section from an archive and that is exactly the edit
-worth a reviewer's eyes. ``tests/test_review_context.py`` pins both.
+worth a reviewer's eyes. This plugin's own repo pins both in CI.
 """
 
 OMIT_PATTERNS = (
