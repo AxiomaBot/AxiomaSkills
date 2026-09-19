@@ -12,16 +12,22 @@
 # There is no docs-only or otherwise path-based skip anywhere in this workflow:
 # this guard runs on every PR.
 #
-# THREE kinds of grant count, because each auto-approves something for every
-# future session and `permissions.allow` is the narrowest of the three:
+# FOUR kinds of grant count, because each auto-approves something for every
+# future session and `permissions.allow` is the narrowest of them:
 #
-#   allow                 one tool pattern pre-approved.
-#   additionalDirectories filesystem reach outside the project.
-#   defaultMode           the blanket setting. `bypassPermissions`, `dontAsk`
-#                         and `acceptEdits` each approve a whole class of action
-#                         with no allow entry at all, so a guard reading only
-#                         `allow` waves through the broadest grant of the three
-#                         while blocking the narrowest.
+#   allow                     one tool pattern pre-approved.
+#   additionalDirectories     filesystem reach outside the project.
+#   defaultMode               the blanket setting. `bypassPermissions`,
+#                             `dontAsk` and `acceptEdits` each approve a whole
+#                             class of action with no allow entry at all, so a
+#                             guard reading only `allow` waves through the
+#                             broadest grant while blocking the narrowest.
+#   enableAllProjectMcpServers a top-level key (a sibling of `permissions`,
+#                             not nested under it) that auto-approves every
+#                             MCP server the project's own `.mcp.json`
+#                             declares, with no per-server confirmation —
+#                             arbitrary code, on every future session, that
+#                             nothing above this line would ever see.
 #
 # The mode test is an ALLOWLIST (SAFE_DEFAULT_MODES), not a blocklist: a mode
 # that ships after this was written fails closed and gets looked at, rather than
@@ -52,7 +58,10 @@ grants() {
     ( (.permissions.additionalDirectories // [])[] | "additionalDirectories: \(.)" ),
     ( (.permissions.defaultMode // empty)
         | select(. as $mode | $safe | index($mode) == null)
-        | "defaultMode: \(.)" )
+        | "defaultMode: \(.)" ),
+    ( (.enableAllProjectMcpServers // false)
+        | select(. == true)
+        | "enableAllProjectMcpServers: true" )
   ' 2>/dev/null || true
 }
 

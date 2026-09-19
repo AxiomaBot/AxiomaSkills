@@ -6,9 +6,10 @@ so a hole here is a hole in every consumer at once, and silently. Each test
 builds a two-commit repository, puts exactly one thing in the head state, and
 asserts the guard's verdict.
 
-Only `permissions.allow` was ever checked. `defaultMode` and
-`additionalDirectories` grant strictly more and went through untouched, which
-is the gap these tests pin shut.
+Only `permissions.allow` was ever checked. `defaultMode`,
+`additionalDirectories`, and the top-level `enableAllProjectMcpServers` all
+grant strictly more and went through untouched, which is the gap these tests
+pin shut.
 """
 
 import json
@@ -159,10 +160,33 @@ def test_an_additional_directory_already_at_base_passes(tmp_path: Path):
     assert run_guard(tmp_path, {S: settings}, {S: settings}).returncode == 0
 
 
+# --- enableAllProjectMcpServers: a top-level key, not under `.permissions` ---
+
+
+def test_enable_all_project_mcp_servers_true_fails(tmp_path: Path):
+    result = run_guard(tmp_path, {}, {S: {"enableAllProjectMcpServers": True}})
+    assert result.returncode == 1
+    assert "enableAllProjectMcpServers: true" in result.stderr
+
+
+def test_enable_all_project_mcp_servers_false_passes(tmp_path: Path):
+    result = run_guard(tmp_path, {}, {S: {"enableAllProjectMcpServers": False}})
+    assert result.returncode == 0, result.stderr
+
+
+def test_enable_all_project_mcp_servers_absent_passes(tmp_path: Path):
+    assert run_guard(tmp_path, {}, {S: {"model": "opus"}}).returncode == 0
+
+
+def test_enable_all_project_mcp_servers_already_at_base_passes(tmp_path: Path):
+    settings = {"enableAllProjectMcpServers": True}
+    assert run_guard(tmp_path, {S: settings}, {S: settings}).returncode == 0
+
+
 # --- shared behaviour
 
 
-def test_all_three_kinds_are_reported_together(tmp_path: Path):
+def test_all_four_kinds_are_reported_together(tmp_path: Path):
     result = run_guard(
         tmp_path,
         {},
@@ -172,7 +196,8 @@ def test_all_three_kinds_are_reported_together(tmp_path: Path):
                     "allow": ["Bash(curl:*)"],
                     "additionalDirectories": ["/srv"],
                     "defaultMode": "bypassPermissions",
-                }
+                },
+                "enableAllProjectMcpServers": True,
             }
         },
     )
@@ -181,6 +206,7 @@ def test_all_three_kinds_are_reported_together(tmp_path: Path):
         "allow: Bash(curl:*)",
         "additionalDirectories: /srv",
         "defaultMode: bypassPermissions",
+        "enableAllProjectMcpServers: true",
     ):
         assert expected in result.stderr
 
