@@ -28,7 +28,8 @@ from pathlib import Path
 
 import pytest
 
-PLUGIN = Path(__file__).resolve().parents[1]
+REPO = Path(__file__).resolve().parents[1]
+PLUGIN = REPO / "plugins" / "agentic-workflow"
 MODELS_TEMPLATE = PLUGIN / "templates" / "models.md"
 
 # The one row distinctive enough to find a stray copy of the table by.
@@ -36,10 +37,13 @@ TABLE_FINGERPRINT = "| security review | opus | opus |"
 
 # Where the tier table may legitimately appear: its single source, and the
 # fixture project, which holds it because `init` put it there.
-TABLE_HOMES = {"templates/models.md", "fixture/CLAUDE.md"}
+TABLE_HOMES = {
+    "plugins/agentic-workflow/templates/models.md",
+    "fixture/CLAUDE.md",
+}
 
 AGENTS_SECTIONS_TEMPLATE = PLUGIN / "templates" / "agents-sections.md"
-FIXTURE_AGENTS = PLUGIN / "fixture" / "AGENTS.md"
+FIXTURE_AGENTS = REPO / "fixture" / "AGENTS.md"
 
 # The one line in templates/agents-sections.md's `## Release model` that is
 # meant to differ per project (how *this* project actually ships).
@@ -91,12 +95,12 @@ def _table_tiers(text: str) -> tuple[str, ...]:
     [
         (
             "scripts/check_committed_permission_grants.sh",
-            "templates/check_committed_permission_grants.sh",
+            "plugins/agentic-workflow/templates/check_committed_permission_grants.sh",
         ),
     ],
 )
 def test_the_guard_we_run_is_the_guard_we_ship(ours: str, shipped: str):
-    run, ship = PLUGIN / ours, PLUGIN / shipped
+    run, ship = REPO / ours, REPO / shipped
     assert run.exists(), f"{ours} is missing"
     assert ship.exists(), f"{shipped} is missing"
     assert run.read_bytes() == ship.read_bytes(), (
@@ -115,7 +119,7 @@ def test_the_fixture_ships_the_models_template_untuned():
     every skill smoke-test reads against.
     """
     template = MODELS_TEMPLATE.read_text(encoding="utf-8").strip()
-    claude_md = (PLUGIN / "fixture" / "CLAUDE.md").read_text(encoding="utf-8")
+    claude_md = (REPO / "fixture" / "CLAUDE.md").read_text(encoding="utf-8")
     start = claude_md.index("## Models")
     end = claude_md.index("## Layout")
     assert claude_md[start:end].strip() == template, (
@@ -160,11 +164,11 @@ def test_every_tier_recommendation_is_at_or_above_its_floor():
 def test_the_tier_table_lives_in_exactly_one_place():
     """No fourth copy grows back into a skill, an agent, or the README."""
     strays = sorted(
-        str(path.relative_to(PLUGIN))
-        for path in PLUGIN.rglob("*.md")
+        str(path.relative_to(REPO))
+        for path in REPO.rglob("*.md")
         if ".git" not in path.parts
         and TABLE_FINGERPRINT in path.read_text(encoding="utf-8")
-        and str(path.relative_to(PLUGIN)) not in TABLE_HOMES
+        and str(path.relative_to(REPO)) not in TABLE_HOMES
     )
     assert not strays, (
         f"the tier table is reproduced in {strays}; templates/models.md is its "

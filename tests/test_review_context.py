@@ -18,6 +18,8 @@ import pytest
 
 SCRIPT = (
     Path(__file__).resolve().parents[1]
+    / "plugins"
+    / "agentic-workflow"
     / "skills"
     / "pr-review"
     / "scripts"

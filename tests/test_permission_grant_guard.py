@@ -19,8 +19,8 @@ from pathlib import Path
 
 import pytest
 
-PLUGIN = Path(__file__).resolve().parents[1]
-GUARD = PLUGIN / "scripts" / "check_committed_permission_grants.sh"
+REPO = Path(__file__).resolve().parents[1]
+GUARD = REPO / "scripts" / "check_committed_permission_grants.sh"
 
 pytestmark = pytest.mark.skipif(
     not (shutil.which("jq") and shutil.which("git")),

@@ -15,9 +15,10 @@ from pathlib import Path
 
 import pytest
 
-PLUGIN = Path(__file__).resolve().parents[1]
+REPO = Path(__file__).resolve().parents[1]
+PLUGIN = REPO / "plugins" / "agentic-workflow"
 SCRIPT = PLUGIN / "skills" / "workflow" / "scripts" / "workflow_check.py"
-FIXTURE = PLUGIN / "fixture"
+FIXTURE = REPO / "fixture"
 
 
 def _load():
