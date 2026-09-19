@@ -33,11 +33,16 @@ Target: `$ARGUMENTS` as `<feature> <chunk>`. Empty → ask and stop.
 0. **Set up, or resume.** **On both paths the worktree must be clean**
    (`git status --porcelain` — anything → escalate, never stash or discard):
    unattended, a dirty tree is uncommitted work, or a crashed run's
-   leftovers, that must not ride into a fix or handoff commit. If
-   `.auto_chunk_state.md` exists at the repo root (gitignored), this is a
-   resume: check the tree, read the PR, branch and chunk from the file,
-   check out that branch, check the tree again, and jump to the matching
-   step. Otherwise: `git fetch origin main`;
+   leftovers, that must not ride into a fix or handoff commit. The state file
+   is `$(git rev-parse --git-dir)/auto_chunk_state.md`, inside the git
+   directory and never in the worktree: nothing in this plugin writes a
+   consuming project's `.gitignore`, so a state file at the repo root would
+   be untracked, show as `??`, and fail that clean-tree check on every single
+   resume. Resolve it with `git rev-parse` rather than hardcoding `.git/`,
+   which is a file and not a directory in a linked worktree. If it exists,
+   this is a resume: check the tree, read the PR, branch and chunk from the
+   file, check out that branch, check the tree again, and jump to the
+   matching step. Otherwise: `git fetch origin main`;
    `git checkout -b feat/<feature>-<n>-<slug> origin/main` with plain `-b`,
    never `-B`; a name collision → pick another or escalate.
 1. **Plan.** Spawn a foreground subagent on the planning model: *run the
@@ -53,7 +58,7 @@ Target: `$ARGUMENTS` as `<feature> <chunk>`. Empty → ask and stop.
    name, never `git add -A` — this commit carries bookkeeping only, and a
    blanket add sweeps in whatever else the build left behind; commit.
 4. **Open the PR.** Push; open a small, non-draft PR into `main`. Write
-   `.auto_chunk_state.md` (PR number, branch, chunk, feature) — **this is the
+   the state file (PR number, branch, chunk, feature) — **this is the
    first point a run is resumable**, so a crash before it leaves a branch and
    no state file, and re-invoking hits step 0's name-collision rule and
    escalates. That is the intended outcome, not a gap: there is no PR yet to
@@ -88,7 +93,7 @@ Target: `$ARGUMENTS` as `<feature> <chunk>`. Empty → ask and stop.
    unverified. If CI is still running, arm `send_later` when available;
    otherwise tell the human it is clean and awaiting CI and stop — never ask
    them to merge in your place. Squash-merge. Never tag.
-7. **Finish.** `unsubscribe_pr_activity`; delete `.auto_chunk_state.md`. One
+7. **Finish.** `unsubscribe_pr_activity`; delete the state file. One
    message: the chunk is merged; which boxes are ticked and which not, and
    why; the feature status now; what to manual-test at the named checkpoint
    and that signing it off, marking the feature `done` and tagging are theirs;

@@ -50,6 +50,13 @@ necessary to understand:
 If broader context is required, flag it as "needs broader manual review"
 instead of scanning unrelated areas.
 
+**Never open a file the context marks `[PROCESS ARTIFACT ...]`**, and never
+open a chunk file under `docs/features/*/chunks/` by any route. Those files
+carry the author's own goal, assumptions and rationale, and `pr.diff`
+withholds them deliberately — reading one hands back exactly the context that
+spawning you fresh is meant to keep out. Grep and Glob are how it would
+happen by accident, so a search hit inside one is skipped, not followed.
+
 Look specifically for:
 - authentication bypasses
 - authorization bugs

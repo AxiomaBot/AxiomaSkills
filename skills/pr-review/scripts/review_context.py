@@ -79,7 +79,9 @@ worth a reviewer's eyes. ``tests/test_review_context.py`` pins both.
 """
 
 OMIT_PATTERNS = (
+    # The only path this plugin's own layout ever produces.
     "docs/features/*/chunks/*.md",
+    # Legacy, from the project this plugin was extracted from -- see below.
     "docs/audits/**/*.md",
     "docs/plan.md",
 )
@@ -88,11 +90,23 @@ OMIT_PATTERNS = (
 A chunk file is the build's own *input specification* -- its goal, assumptions
 and rationale are exactly what spawning fresh reviewers withholds, so shipping
 it inside ``pr.diff`` would hand back what the prompt is written to keep out.
-An audit report is an auditor's prose about the workflow, not the change under
-review. Scoped to markdown deliberately: a script or config that ever lands
-under one of these paths stays fully in the diff like any other changed file.
-(``docs/plan.md`` is the pre-redesign chunk file, omitted for the same reason
-for as long as the path still exists.)
+Scoped to markdown deliberately: a script or config that ever lands under one
+of these paths stays fully in the diff like any other changed file.
+
+**The last two patterns are legacy and match nothing this plugin creates.** No
+skill writes to either path and ``workflow init`` scaffolds neither, so a
+project set up from this plugin will never hit them. They are the pre-extraction
+layout of the project this workflow came out of: ``docs/plan.md`` was the single
+chunk file before per-feature folders, and ``docs/audits/`` held auditors' prose
+about the workflow rather than about the change under review.
+
+They stay because the cost is asymmetric. A pattern that matches nothing costs a
+consuming project nothing, while dropping one that still matches somewhere would
+quietly start feeding a reviewer the author's own rationale -- the exact
+property this module exists to hold. Drop them once no repository using this
+plugin has a file at either path; note that a migration moves both under
+``docs/archive/`` with ``git mv``, and that directory is deliberately *not*
+omitted (see :data:`EXCLUDES`).
 """
 
 OUTPUT_FILES = {"changed-files.txt", "pr.diff"}
