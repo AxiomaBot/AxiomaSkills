@@ -25,7 +25,17 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Fail on new allow-list entries in any tracked settings file
+      - name: Ensure jq is available
+        # The guard fails closed without jq, which is correct but would read as
+        # a mystery failure. ubuntu-latest ships it; this keeps the job honest
+        # on any runner that does not.
+        run: |
+          if ! command -v jq >/dev/null 2>&1; then
+            sudo apt-get update && sudo apt-get install -y jq
+          fi
+          jq --version
+
+      - name: Fail on new permission grants in any tracked settings file
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
         run: bash scripts/check_committed_permission_grants.sh "$BASE_SHA"
