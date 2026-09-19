@@ -12,44 +12,76 @@
 # There is no docs-only or otherwise path-based skip anywhere in this workflow:
 # this guard runs on every PR.
 #
-# The comparison is over the UNION of `permissions.allow` entries across every
-# tracked `.claude/settings*.json` (base vs. head), keyed on the grant string
-# itself — not per file path. So renaming/moving a settings file, or splitting
-# one into several, never reads unchanged grants as "new"; only a grant string
-# absent from every settings file at <base> fails.
+# THREE kinds of grant count, because each auto-approves something for every
+# future session and `permissions.allow` is the narrowest of the three:
+#
+#   allow                 one tool pattern pre-approved.
+#   additionalDirectories filesystem reach outside the project.
+#   defaultMode           the blanket setting. `bypassPermissions`, `dontAsk`
+#                         and `acceptEdits` each approve a whole class of action
+#                         with no allow entry at all, so a guard reading only
+#                         `allow` waves through the broadest grant of the three
+#                         while blocking the narrowest.
+#
+# The mode test is an ALLOWLIST (SAFE_DEFAULT_MODES), not a blocklist: a mode
+# that ships after this was written fails closed and gets looked at, rather than
+# being permitted by an enumeration nobody remembered to update. If a new mode
+# genuinely grants nothing, add it there.
+#
+# The comparison is over the UNION of grants across every tracked
+# `.claude/settings*.json` (base vs. head), keyed on the grant itself — not per
+# file path. So renaming/moving a settings file, or splitting one into several,
+# never reads unchanged grants as "new"; only a grant absent from every settings
+# file at <base> fails.
 #
 # Usage: check_committed_permission_grants.sh <base-ref>
 set -euo pipefail
 
 base="${1:?usage: check_committed_permission_grants.sh <base-ref>}"
 
+# The only `permissions.defaultMode` values that grant nothing: `default`
+# prompts as it normally would, and `plan` is strictly more restrictive.
+SAFE_DEFAULT_MODES='["default","plan"]'
+
+# Every grant in one settings file (read from stdin) as a `<kind>: <value>`
+# line. Defined once and used for base, for head, and for the per-file report,
+# so those three can never disagree about what counts as a grant.
+grants() {
+  jq -r --argjson safe "$SAFE_DEFAULT_MODES" '
+    ( (.permissions.allow // [])[]                 | "allow: \(.)" ),
+    ( (.permissions.additionalDirectories // [])[] | "additionalDirectories: \(.)" ),
+    ( (.permissions.defaultMode // empty)
+        | select(. as $mode | $safe | index($mode) == null)
+        | "defaultMode: \(.)" )
+  ' 2>/dev/null || true
+}
+
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
 
 settings_re='^\.claude/settings[^/]*\.json$'
 
-# Union of allow entries across every tracked .claude/settings*.json at BASE.
+# Union of grants across every tracked .claude/settings*.json at BASE.
 git ls-tree -r --name-only "$base" -- .claude 2>/dev/null \
   | grep -E "$settings_re" | sort -u > "$tmp/base_files" || true
-: > "$tmp/base_allow"
+: > "$tmp/base_grants"
 while IFS= read -r f; do
   [ -n "$f" ] || continue
-  git show "$base:$f" 2>/dev/null \
-    | jq -r '.permissions.allow // [] | .[]' 2>/dev/null >> "$tmp/base_allow" || true
+  git show "$base:$f" 2>/dev/null | grants >> "$tmp/base_grants" || true
 done < "$tmp/base_files"
-sort -u "$tmp/base_allow" -o "$tmp/base_allow"
+sort -u "$tmp/base_grants" -o "$tmp/base_grants"
 
-# Union of allow entries across every tracked .claude/settings*.json in HEAD.
+# Union of grants across every tracked .claude/settings*.json in HEAD.
 git ls-files -- .claude | grep -E "$settings_re" | sort -u > "$tmp/head_files" || true
-
-# Grants present in HEAD but in no settings file at BASE.
-: > "$tmp/head_allow"
+: > "$tmp/head_grants"
 while IFS= read -r f; do
   [ -f "$f" ] || continue
-  jq -r '.permissions.allow // [] | .[]' "$f" 2>/dev/null >> "$tmp/head_allow" || true
+  grants < "$f" >> "$tmp/head_grants" || true
 done < "$tmp/head_files"
-sort -u "$tmp/head_allow" -o "$tmp/head_allow"
-comm -13 "$tmp/base_allow" "$tmp/head_allow" > "$tmp/added" || true
+sort -u "$tmp/head_grants" -o "$tmp/head_grants"
+
+# Grants present in HEAD but in no settings file at BASE.
+comm -13 "$tmp/base_grants" "$tmp/head_grants" > "$tmp/added" || true
 
 if [ ! -s "$tmp/added" ]; then
   echo "OK: no new permission grants across tracked .claude/settings*.json."
@@ -59,11 +91,11 @@ fi
 # Report each new grant against the head file(s) it appears in, for the fixer.
 while IFS= read -r f; do
   [ -f "$f" ] || continue
-  jq -r '.permissions.allow // [] | .[]' "$f" 2>/dev/null | sort -u > "$tmp/f_allow" || : > "$tmp/f_allow"
-  f_new="$(comm -12 "$tmp/f_allow" "$tmp/added" || true)"
+  grants < "$f" | sort -u > "$tmp/f_grants" || : > "$tmp/f_grants"
+  f_new="$(comm -12 "$tmp/f_grants" "$tmp/added" || true)"
   if [ -n "$f_new" ]; then
     echo "::error file=$f::New permission grant(s) committed to $f — move them to untracked local config (AGENTS.md: never commit a permission grant)." >&2
-    printf '  %s\n' "$f_new" >&2
+    sed 's/^/  /' <<<"$f_new" >&2
   fi
 done < "$tmp/head_files"
 

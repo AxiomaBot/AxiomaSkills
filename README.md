@@ -211,9 +211,11 @@ the pin above exists to avoid.
 
 `enabledPlugins` and `extraKnownMarketplaces` are ordinary settings, not
 permission grants — and note that this workflow treats a committed
-`permissions.allow` entry as a defect. Both this repo and every project the
-`workflow` skill scaffolds run a CI guard that fails a PR which adds one; a
-tool grant your orchestration needs belongs in untracked local settings.
+permission grant as a defect: an `allow` entry, an `additionalDirectories`
+entry, or a `defaultMode` that is not `default` or `plan`. Both this repo and
+every project the `workflow` skill scaffolds run a CI guard that fails a PR
+which adds one; a tool grant your orchestration needs belongs in untracked
+local settings.
 
 ---
 
@@ -425,13 +427,14 @@ your project is ever regenerated from here.
 | `templates/weak-spots.md` | `docs/weak-spots.md` | Header, the expiry rule, the tag vocabulary, an empty five-column table. On a migration, seeded one line per recurring-blocker category from your old build prompt, anecdotes dropped |
 | `templates/feature.md` | `docs/features/<slug>/feature.md` | Written by `roadmap detail` per feature, not by `init` itself |
 | `templates/chunk.md` | `docs/features/<slug>/chunks/<n>-<slug>.md` | Written by `plan` per chunk |
+| `templates/models.md` | `CLAUDE.md` → `## Models` | The tier table, floors and "go one up" triggers. **The only copy** — the skills and this README point here rather than restating it |
 | `templates/agents-sections.md` | appended to `AGENTS.md` | The three `##` headings read *by name* by the skills and both reviewer agents: Domain rules for code review, Release model, Weak spots. The content under each is yours and grows over time |
 | `templates/pr-guards.yml` | `.github/workflows/pr-guards.yml` | All three jobs, not just one: a gitleaks secret scan on the PR's own commits, the committed-permission-grant guard, and review coverage |
-| `templates/check_committed_permission_grants.sh` | `scripts/` (executable) | Fails a PR that adds a `permissions.allow` entry to a tracked settings file |
+| `templates/check_committed_permission_grants.sh` | `scripts/` (executable) | Fails a PR that adds a permission grant to a tracked settings file: an `allow` entry, an `additionalDirectories` entry, or a `defaultMode` other than `default`/`plan` |
 | `templates/check_review_coverage.sh` | `scripts/` (executable) | Fails a PR whose head has not had both review reports posted |
 
 `init` also writes, with no template: `CLAUDE.md` → `## Commands` (your
-project's own lint, format and test commands) and `## Models`, plus
+project's own lint, format and test commands), plus
 `docs/deferred.md`, `docs/roadmap_changelog.md`, and `docs/features/` and
 `docs/retros/` with a `.keep` in each, because git carries files, not
 directories.
@@ -445,39 +448,26 @@ agents do.
 
 ## Model tiers and floors
 
-`init` writes this table into your project's `CLAUDE.md` under `## Models`.
+`init` writes [`templates/models.md`](templates/models.md) into your
+project's `CLAUDE.md` under `## Models`. **That file is the single source for
+the tier table, and it is deliberately not reproduced here** — three hand-kept
+copies of it is exactly how a floor drifts from the method. Read it there.
+
 The **floors are the method**; the *Recommended* column and the *Go one up
-when* triggers are yours to tune.
+when* triggers are yours to tune once the table lands in your project.
 
-```markdown
-## Models
-
-Order, weakest first: haiku < sonnet < opus < fable (the current Claude
-model families; extend the line when a new one ships).
-
-| Tier | Floor | Recommended | Go one up when |
-|------|-------|-------------|----------------|
-| planning | opus | opus | the feature touches auth, tokens, the data model, or a migration; a roadmap `init`/`refine` with open product questions; a retro that proposes removing rules |
-| coding | sonnet | sonnet | the chunk file says so; the chunk touches shared services, a migration, or concurrency; the previous chunk in the same subsystem bounced in review |
-| fix-review | sonnet | opus | always recommended: disagreeing with a reviewer on evidence needs judgment |
-| quality review | sonnet | sonnet | the diff changes the review contract itself, or `--model` is passed to the `pr-review` skill |
-| security review | opus | opus | — |
-
-An attended skill stops if the session model is below its tier's floor and
-never switches a session down. Spawned agents receive the tier's model
-explicitly: the recommended one by default, or the override.
-```
-
-> This table is reproduced from `skills/workflow/SKILL.md`, which is the copy
-> `init` actually writes. The two must stay identical — and the tier *names*
-> in the left column are parsed by `skills/workflow/scripts/workflow_check.py`
-> (`TIERS`), so renaming a tier is a three-file change.
+> The tier *names* in that table's left column are also parsed by
+> `skills/workflow/scripts/workflow_check.py` (`TIERS`), and `fixture/` ships
+> the table untuned as a real project would receive it.
+> `tests/test_bundled_copies.py` pins both to the template, so renaming a tier
+> is one edit plus whatever CI then names — not a change you have to remember
+> to make in three places.
 
 Who picks, and where it is recorded:
 
 - **The planner picks the build model.** `plan` ends the chunk file with
   `Build model: <model> — <why>`, defaulting to the coding recommendation and
-  raising it on the triggers above. `build` reads it and stops if the session
+  raising it on that table's *Go one up when* triggers. `build` reads it and stops if the session
   is below it; `auto-chunk` spawns the builder on it. `roadmap detail` may
   pre-set it in a chunk's spec when the reason is already known.
 - **The session picks the planning model.** Running `plan` or `roadmap` on a

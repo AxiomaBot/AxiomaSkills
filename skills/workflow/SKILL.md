@@ -76,29 +76,19 @@ Then, in order:
 2. Add the `AGENTS.md` sections from
    `${CLAUDE_PLUGIN_ROOT}/templates/agents-sections.md` and, in `CLAUDE.md`,
    `## Commands` (lint, format, test, one fenced block — this project's own,
-   there is no template for it) and `## Models`: copy the tier table below
-   verbatim, then tune the *Recommended* column and the *Go one up when*
-   triggers to the project — the floors are the method, the recommendations
-   are the project's to set.
+   there is no template for it) and `## Models`, copied verbatim from
+   `${CLAUDE_PLUGIN_ROOT}/templates/models.md`. Then tune the *Recommended*
+   column and the *Go one up when* triggers to the project — the floors are
+   the method, the recommendations are the project's to set.
 
-   ```markdown
-   ## Models
+   That template is the **only** copy of the tier table anywhere in this
+   plugin. Read it; never retype it from memory or from the README, which
+   deliberately does not reproduce it. Changing a floor is an edit to that
+   one file, plus `TIERS` in this skill's own check script when a tier is
+   renamed — and `tests/test_bundled_copies.py` pins the two together, and
+   pins `fixture/`'s `## Models` to the template as well, so a missed copy
+   fails CI by name rather than drifting.
 
-   Order, weakest first: haiku < sonnet < opus < fable (the current Claude
-   model families; extend the line when a new one ships).
-
-   | Tier | Floor | Recommended | Go one up when |
-   |------|-------|-------------|----------------|
-   | planning | opus | opus | the feature touches auth, tokens, the data model, or a migration; a roadmap `init`/`refine` with open product questions; a retro that proposes removing rules |
-   | coding | sonnet | sonnet | the chunk file says so; the chunk touches shared services, a migration, or concurrency; the previous chunk in the same subsystem bounced in review |
-   | fix-review | sonnet | opus | always recommended: disagreeing with a reviewer on evidence needs judgment |
-   | quality review | sonnet | sonnet | the diff changes the review contract itself, or `--model` is passed to the `pr-review` skill |
-   | security review | opus | opus | — |
-
-   An attended skill stops if the session model is below its tier's floor and
-   never switches a session down. Spawned agents receive the tier's model
-   explicitly: the recommended one by default, or the override.
-   ```
 3. Install the whole `pr-guards.yml` from
    `${CLAUDE_PLUGIN_ROOT}/templates/pr-guards.yml` to
    `.github/workflows/pr-guards.yml`, and its two scripts from
