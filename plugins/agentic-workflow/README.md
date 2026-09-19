@@ -210,10 +210,14 @@ count.
 `enabledPlugins` and `extraKnownMarketplaces` are ordinary settings, not
 permission grants — and note that this workflow treats a committed
 permission grant as a defect: an `allow` entry, an `additionalDirectories`
-entry, a `defaultMode` that is not `default` or `plan`, or a top-level
-`enableAllProjectMcpServers: true`. Both this repo and every project the
-`workflow` skill scaffolds run a CI guard that fails a PR which adds one; a
-tool grant your orchestration needs belongs in untracked local settings.
+entry, a `defaultMode` that is not `default` or `plan`, or either of the
+MCP auto-approvals, `enableAllProjectMcpServers: true` and
+`enabledMcpjsonServers`. Both this repo and every project the `workflow` skill
+scaffolds run a CI guard that fails a PR which adds one; a tool grant your
+orchestration needs belongs in untracked local settings. The guard **fails
+closed**: a settings file it cannot parse, or a runner without `jq`, is an
+error rather than a pass, because a control that reports success on input it
+could not read is worse than no control at all.
 
 ---
 
@@ -428,7 +432,7 @@ your project is ever regenerated from here.
 | `templates/models.md` | `CLAUDE.md` → `## Models` | The tier table, floors and "go one up" triggers. **The only copy** — the skills and this README point here rather than restating it |
 | `templates/agents-sections.md` | appended to `AGENTS.md` | The three `##` headings read *by name* by the skills and both reviewer agents: Domain rules for code review, Release model, Weak spots. Most of the content is yours and grows over time, except `## Weak spots` in full and `## Release model`'s four floor bullets, which are fixed by the method — `tests/test_bundled_copies.py` pins `fixture/AGENTS.md`'s copy of those to this template |
 | `templates/pr-guards.yml` | `.github/workflows/pr-guards.yml` | All three jobs, not just one: a gitleaks secret scan on the PR's own commits, the committed-permission-grant guard, and review coverage |
-| `templates/check_committed_permission_grants.sh` | `scripts/` (executable) | Fails a PR that adds a permission grant to a tracked settings file: an `allow` entry, an `additionalDirectories` entry, a `defaultMode` other than `default`/`plan`, or `enableAllProjectMcpServers: true` |
+| `templates/check_committed_permission_grants.sh` | `scripts/` (executable) | Fails a PR that adds a permission grant to a tracked settings file: an `allow` entry, an `additionalDirectories` entry, a `defaultMode` other than `default`/`plan`, or either MCP auto-approval. Fails closed on a settings file it cannot parse, or on a runner with no `jq` |
 | `templates/check_review_coverage.sh` | `scripts/` (executable) | Fails a PR whose head has not had both review reports posted |
 
 `init` also writes, with no template: `CLAUDE.md` → `## Commands` (your
