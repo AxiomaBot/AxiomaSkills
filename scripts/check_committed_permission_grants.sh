@@ -7,7 +7,10 @@
 # session in the repo — grants belong in untracked local config, never the repo
 # (the agentic-workflow plugin's auto-chunk skill never commits one to obtain a
 # tool it needs, for exactly this reason). This is the deterministic floor
-# under the security review's docs-only skip.
+# under a *diff-only* security review, which sees a settings file only when it
+# is in the diff and is poorly placed to weigh what a grant really authorises.
+# There is no docs-only or otherwise path-based skip anywhere in this workflow:
+# this guard runs on every PR.
 #
 # The comparison is over the UNION of `permissions.allow` entries across every
 # tracked `.claude/settings*.json` (base vs. head), keyed on the grant string

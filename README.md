@@ -555,7 +555,10 @@ contract rather than to prose:
 2. Run the tests: `pytest` (needs only pytest — both bundled scripts are
    stdlib-only). They cover the two scripts the skills execute, and one of
    them runs the layout check against `fixture/`, so a break in either the
-   checker or the fixture fails here. CI runs the same thing on every PR.
+   checker or the fixture fails here. A third pins the guard script this repo
+   runs from `scripts/` byte-for-byte against the copy `init` ships from
+   `templates/`, so editing one and not the other fails rather than silently
+   handing consumers a different guard. CI runs the same thing on every PR.
 3. Run the skill you changed against `fixture/` in a session started with
    `claude --plugin-dir /path/to/AxiomaSkills`. See
    [fixture/README.md](fixture/README.md).

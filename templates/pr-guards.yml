@@ -7,12 +7,12 @@ name: PR guards (secrets, permissions & review coverage)
 # committed secret (e.g. a session cookie left in a test doc) and a committed
 # agent permission grant (e.g. a side-effecting tool auto-approved in
 # `.claude/settings.local.json`). review-coverage covers a different gap:
-# those in-session reviews are agent-invoked, not GitHub-triggered
-# (AGENTS.md → "Claude review fixes" — nothing on GitHub's side forces the
-# pr-review skill to run, so a push nobody reviews is a real gap). AGENTS.md's
-# own policy is that every head gets both reviews, no path-based skip,
-# plan-only and docs-only PRs included — this job is what makes an unreviewed
-# head visible instead of silently unblocked.
+# those in-session reviews are agent-invoked, not GitHub-triggered. Nothing
+# on GitHub's side forces the pr-review skill to run, so a push nobody
+# reviewed is a real gap. The policy this job makes visible is AGENTS.md →
+# "Release model" ("One PR per chunk, reviewed on its own head"), which admits
+# no path-based skip — plan-only and docs-only PRs included. Without it an
+# unreviewed head is silently unblocked rather than visibly unreviewed.
 #
 # All three jobs run on EVERY PR (no `paths-ignore`) — they are the floor.
 
@@ -92,8 +92,10 @@ jobs:
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
         # The guard enumerates every tracked .claude/settings*.json (base ∪
-        # head) so a newly-added settings file can't slip a grant past it. Logic
-        # lives in a script so it is unit-tested (tests/test_permission_grant_guard.py).
+        # head) so a newly-added settings file can't slip a grant past it. The
+        # logic sits in a script rather than inline here so it can be run and
+        # tested directly from a shell, and so this project and the plugin that
+        # ships it run the identical copy.
         run: bash scripts/check_committed_permission_grants.sh "$BASE_SHA"
 
   review-coverage:
