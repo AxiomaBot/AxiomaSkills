@@ -114,9 +114,12 @@ Three properties hold the whole thing together:
 ### Requirements
 
 - Claude Code with plugin support.
-- Python 3.10+ on `PATH` for the two bundled scripts (standard library only —
-  nothing to install). A project with a managed environment prefixes them the
-  way its own `CLAUDE.md` → Commands does (`poetry run`, `uv run`, …).
+- Python 3.10+ on `PATH` for the bundled scripts — the two the skills run
+  (`workflow_check.py`, `review_context.py`) and the CI guard
+  `check_committed_permission_grants.py`. Standard library only, nothing to
+  install. A project with a managed environment prefixes the skills' scripts
+  the way its own `CLAUDE.md` → Commands does (`poetry run`, `uv run`, …);
+  the CI guard runs on the GitHub runner's `python3`.
 - `git`, and `gh` or equivalent for the skills that open PRs and post review
   comments.
 
@@ -213,38 +216,34 @@ permission grant as a defect: an `allow` entry, an `additionalDirectories`
 entry, a `defaultMode` that is not `default` or `plan`, or either of the
 MCP auto-approvals, `enableAllProjectMcpServers` and `enabledMcpjsonServers`.
 Both this repo and every project the `workflow` skill scaffolds run a CI guard
-that fails a PR which adds one; a tool grant your orchestration needs belongs
-in untracked local settings.
+that fails a PR whose tree carries one; a tool grant your orchestration needs
+belongs in untracked local settings.
 
-The guard watches **widening**, not just additions, so **weakening a
-restriction fails too** — deleting a `permissions.deny` or `permissions.ask`
-entry, dropping `defaultMode: "plan"` or `disableBypassPermissionsMode`, or
-re-permitting a `disabledMcpjsonServers` entry, widens the auto-approved surface
-exactly as an added `allow` does. Restrictions are **ordered**, so tightening
-never fails: `deny` is stronger than `ask`, and promoting one to the other is a
-security improvement the guard passes. Downgrading the other way is not.
+The rule is **absolute, not differential**: the guard looks at the PR's own
+tree and fails if a grant is there at all. It does not diff against the base,
+so there is nothing to grandfather in — a grant that predates the workflow
+fails the next PR that touches the repo, and no sequence of commits can walk
+one past it. That also means it has no override: a grant has no legitimate
+in-repo form, so there is no case to let through.
+
+Restrictions (`deny`, `ask`, `disableBypassPermissionsMode`,
+`disabledMcpjsonServers`) are deliberately **not** watched. Tracking whether
+one was weakened means reconstructing the base tree and modelling rule
+ordering and scope ancestry — most of the guard's complexity for the case a
+human reviewer reads most easily, since deleting a `deny` line is visible in
+the diff. The guard keeps the case a reviewer misses: a grant buried in a
+settings file they did not open.
 
 It reads **every** tracked `.claude/settings*.json` at any depth, since
 `packages/app/.claude/settings.json` is live for anyone working in that
 subdirectory, and it enumerates paths as raw bytes from the repo root so
 neither a non-ASCII directory name nor an odd working directory can hide one.
+On a sparse checkout it falls back to the file's content in the index.
 
-Because depth matters, entries are compared **per scope**, and a scope is
-covered by any of its ancestors: a root entry covers the whole repo, one at
-`packages/` covers `packages/app/`. So moving a grant to a broader scope is a
-new grant while narrowing it is not, and moving a restriction to a broader
-scope is a tightening while moving it deeper is a weakening. Splitting one
-scope's settings across `settings.json` and `settings.local.json` changes
-nothing.
-
-A weakening can be overridden with `ALLOW_PERMISSION_WEAKENING=1` on the job,
-because a `deny` whose rule went obsolete has to be deletable, and setting that
-variable is itself a reviewable diff. **An added grant has no override**, since
-it has no legitimate in-repo form.
-
-And it **fails closed**: a settings file it cannot parse, or a runner without
-`jq`, is an error rather than a pass, because a control that reports success on
-input it could not read is worse than no control at all.
+And it **fails closed**: a settings file it cannot read or parse — empty,
+malformed, undecodable bytes, or a JSON shape it did not expect — is an error
+rather than a pass, because a control that reports success on input it could
+not read is worse than no control at all.
 
 ---
 
@@ -281,7 +280,7 @@ docs/
   weak-spots.md                # capped at 30; only the retro skill writes it
   roadmap_changelog.md
 .github/workflows/pr-guards.yml
-scripts/check_committed_permission_grants.sh
+scripts/check_committed_permission_grants.py
 scripts/check_review_coverage.sh
 ```
 
@@ -459,7 +458,7 @@ your project is ever regenerated from here.
 | `templates/models.md` | `CLAUDE.md` → `## Models` | The tier table, floors and "go one up" triggers. **The only copy** — the skills and this README point here rather than restating it |
 | `templates/agents-sections.md` | appended to `AGENTS.md` | The three `##` headings read *by name* by the skills and both reviewer agents: Domain rules for code review, Release model, Weak spots. Most of the content is yours and grows over time, except `## Weak spots` in full and `## Release model`'s four floor bullets, which are fixed by the method — `tests/test_bundled_copies.py` pins `fixture/AGENTS.md`'s copy of those to this template |
 | `templates/pr-guards.yml` | `.github/workflows/pr-guards.yml` | All three jobs, not just one: a gitleaks secret scan on the PR's own commits, the committed-permission-grant guard, and review coverage |
-| `templates/check_committed_permission_grants.sh` | `scripts/` (executable) | Fails a PR that widens what an agent may do without asking, in any tracked `.claude/settings*.json` at any depth: an added `allow`, `additionalDirectories`, non-`default`/`plan` `defaultMode` or MCP auto-approval, **or a weakened `deny`/`ask`/`plan` restriction**. Tightening passes. Fails closed on a file it cannot parse, or a runner with no `jq` |
+| `templates/check_committed_permission_grants.py` | `scripts/` (run as `python3`) | Fails a PR whose tree contains **any** permission grant, in any tracked `.claude/settings*.json` at any depth: `allow`, `additionalDirectories`, a `defaultMode` other than `default`/`plan`, `enableAllProjectMcpServers`, or `enabledMcpjsonServers`. No base comparison — a grant that predates the workflow fails too, so there is nothing to grandfather in. Fails closed on a file it cannot read or parse. Stdlib-only, no `jq` |
 | `templates/check_review_coverage.sh` | `scripts/` (executable) | Fails a PR whose head has not had both review reports posted |
 
 `init` also writes, with no template: `CLAUDE.md` → `## Commands` (your
@@ -472,6 +471,31 @@ directories.
 regenerated from the plugin**: GitHub Actions runs against your checkout, not
 this one, and that deterministic floor is what sits under everything the
 agents do.
+
+### Upgrading the guard from 0.3.0 or earlier
+
+0.3.0 and earlier shipped the permission guard as
+`check_committed_permission_grants.sh`, a base-vs-head diff. 0.4.0 replaces
+it with the absolute `.py` check. Because the guard lives in your project,
+upgrading the plugin does not move it — do it by hand, in three steps:
+
+1. `git rm scripts/check_committed_permission_grants.sh`
+2. Copy `${CLAUDE_PLUGIN_ROOT}/templates/check_committed_permission_grants.py`
+   to `scripts/check_committed_permission_grants.py`.
+3. In `.github/workflows/pr-guards.yml`, replace the
+   `no-committed-permission-grants` job's steps with the ones in
+   [`templates/pr-guards.yml`](templates/pr-guards.yml): a plain
+   `actions/checkout@v7` (no `fetch-depth: 0`), no jq step, no `BASE_SHA`
+   env, and `run: python3 scripts/check_committed_permission_grants.py`.
+
+**Do not re-run `workflow init` for this.** `init` is not idempotent — it
+rewrites `roadmap.md`, `docs/weak-spots.md` and your `## Models` table from
+the templates, discarding a running project's plan.
+
+Expect the first PR after the swap to fail if a grant is already committed:
+the new check is absolute, so it reports what the old differential one had
+grandfathered in. That finding is real — move the grant to untracked local
+settings.
 
 ---
 
