@@ -98,7 +98,7 @@ jobs:
           fi
           jq --version
 
-      - name: Fail on new permission grants in any tracked settings file
+      - name: Fail on widened permissions in any tracked settings file
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
         # The guard enumerates every tracked .claude/settings*.json (base ∪

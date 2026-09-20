@@ -379,7 +379,8 @@ def test_base_side_enumeration_failure_fails_closed(tmp_path: Path):
         ["bash", str(GUARD), "HEAD"], cwd=loose, capture_output=True, text=True
     )
     assert result.returncode == 1
-    assert "base-side enumeration" in result.stderr
+    # Outside a work tree the root check fires before enumeration does.
+    assert "not inside a git work tree" in result.stderr
 
 
 def test_head_side_enumeration_failure_fails_closed(tmp_path: Path):
@@ -399,7 +400,11 @@ def test_head_side_enumeration_failure_fails_closed(tmp_path: Path):
     shim_dir = tmp_path / "shim"
     shim_dir.mkdir()
     (shim_dir / "git").write_text(
-        f'#!/bin/sh\nif [ "$1" = "ls-files" ]; then exit 1; fi\nexec {real_git} "$@"\n',
+        # Match the subcommand wherever it falls: the guard now invokes
+        # `git -c core.quotePath=false ls-files -z`, so `$1` is `-c`.
+        f'#!/bin/sh\nfor a in "$@"; do\n'
+        f'  [ "$a" = "ls-files" ] && exit 1\n'
+        f'done\nexec {real_git} "$@"\n',
         encoding="utf-8",
     )
     (shim_dir / "git").chmod(0o755)
@@ -529,4 +534,326 @@ def test_an_unreadable_work_tree_copy_falls_back_to_the_index(tmp_path: Path):
     finally:
         (repo / S).chmod(0o644)
     assert result.returncode == 1, "the staged grant was lost with the work-tree read"
+    assert 'allow: "Bash(rm:*)"' in result.stderr
+
+
+# --- widening happens two ways: a grant added, or a restriction removed
+
+
+NESTED = "packages/app/.claude/settings.json"
+
+
+def test_a_nested_settings_file_is_not_invisible(tmp_path: Path):
+    """Scoping to the repo root hid a live grant.
+
+    `packages/app/.claude/settings.json` applies to anyone who opens Claude
+    Code in `packages/app`, which in a monorepo is the normal way to work.
+    """
+    result = run_guard(
+        tmp_path, {}, {NESTED: {"permissions": {"defaultMode": "bypassPermissions"}}}
+    )
+    assert result.returncode == 1, "a nested grant was invisible"
+    assert 'defaultMode: "bypassPermissions"' in result.stderr
+    assert NESTED in result.stderr
+
+
+def test_a_nested_grant_already_at_base_passes(tmp_path: Path):
+    settings = {"permissions": {"allow": ["Bash(ls:*)"]}}
+    assert run_guard(tmp_path, {NESTED: settings}, {NESTED: settings}).returncode == 0
+
+
+@pytest.mark.parametrize("kind", ["deny", "ask"])
+def test_removing_a_restriction_is_reported(tmp_path: Path, kind: str):
+    """Deleting a deny widens the surface exactly as adding an allow does."""
+    result = run_guard(
+        tmp_path,
+        {S: {"permissions": {kind: ["Bash(curl:*)"]}}},
+        {S: {"permissions": {}}},
+    )
+    assert result.returncode == 1, f"removing a {kind} entry was permitted"
+    assert f'{kind}: "Bash(curl:*)"' in result.stderr
+    assert "weakens a restriction" in result.stderr
+
+
+def test_deleting_the_whole_settings_file_removes_its_restrictions(tmp_path: Path):
+    result = run_guard(
+        tmp_path, {S: {"permissions": {"deny": ["Bash(curl:*)"]}}}, {S: None}
+    )
+    assert result.returncode == 1
+    assert 'deny: "Bash(curl:*)"' in result.stderr
+
+
+def test_moving_a_restriction_within_one_scope_is_not_a_weakening(tmp_path: Path):
+    """Splitting a scope's settings across two files changes nothing.
+
+    `.claude/settings.json` and `.claude/settings.local.json` share a scope, so
+    the union across them is what counts.
+    """
+    restriction = {"permissions": {"deny": ["Bash(curl:*)"]}}
+    result = run_guard(tmp_path, {S: restriction}, {S: None, LOCAL: restriction})
+    assert result.returncode == 0, result.stderr
+
+
+def test_demoting_a_restriction_to_a_subdirectory_is_a_weakening(tmp_path: Path):
+    """Any-depth discovery makes the path meaningful.
+
+    A root `deny` covers the whole repo; the same entry in
+    `packages/app/.claude/` covers only that subtree, so moving it down is a
+    weakening even though the entry text is unchanged.
+    """
+    restriction = {"permissions": {"deny": ["Bash(curl:*)"]}}
+    result = run_guard(tmp_path, {S: restriction}, {S: None, NESTED: restriction})
+    assert result.returncode == 1, "a demoted restriction read as unchanged"
+    assert 'deny: "Bash(curl:*)"' in result.stderr
+
+
+def test_promoting_a_restriction_to_the_root_is_a_tightening(tmp_path: Path):
+    """The other direction covers strictly more, so it must pass."""
+    restriction = {"permissions": {"deny": ["Bash(curl:*)"]}}
+    result = run_guard(tmp_path, {NESTED: restriction}, {NESTED: None, S: restriction})
+    assert result.returncode == 0, result.stderr
+
+
+def test_promoting_a_grant_to_the_root_is_a_new_grant(tmp_path: Path):
+    """An allow scoped to one subtree is not the same as one repo-wide."""
+    grant = {"permissions": {"allow": ["Bash(rm:*)"]}}
+    result = run_guard(tmp_path, {NESTED: grant}, {NESTED: None, S: grant})
+    assert result.returncode == 1, "a promoted grant read as unchanged"
+    assert 'allow: "Bash(rm:*)"' in result.stderr
+
+
+def test_keeping_every_restriction_passes(tmp_path: Path):
+    settings = {"permissions": {"deny": ["Bash(curl:*)"], "ask": ["Bash(push:*)"]}}
+    assert run_guard(tmp_path, {S: settings}, {S: settings}).returncode == 0
+
+
+def test_adding_a_restriction_is_not_a_finding(tmp_path: Path):
+    """Narrowing is always welcome; only widening is a finding."""
+    result = run_guard(tmp_path, {}, {S: {"permissions": {"deny": ["Bash(curl:*)"]}}})
+    assert result.returncode == 0, result.stderr
+
+
+def test_an_unreadable_base_cannot_make_a_restriction_look_removed(tmp_path: Path):
+    """The base-side warning must stay conservative in both directions."""
+    repo, base = _repo_with_broken_base(tmp_path)
+    (repo / S).write_text('{"permissions": {}}', encoding="utf-8")
+    _git(repo, "add", "-A")
+    result = _run(repo, base)
+    assert result.returncode == 0, result.stderr
+    assert "weakens a restriction" not in result.stderr
+
+
+# --- round five: paths as bytes, and restrictions as an ordered pair
+
+
+QUOTED = "pöckages/.claude/settings.json"
+
+
+def test_a_non_ascii_path_is_not_c_quoted_into_invisibility(tmp_path: Path):
+    """`git ls-files` C-quotes such a path, so it matched no pattern.
+
+    A grant inside it passed clean: a fail-open in a script whose whole
+    contract is the opposite.
+    """
+    result = run_guard(
+        tmp_path, {}, {QUOTED: {"permissions": {"defaultMode": "bypassPermissions"}}}
+    )
+    assert result.returncode == 1, "a grant under a non-ASCII path was invisible"
+    assert 'defaultMode: "bypassPermissions"' in result.stderr
+
+
+def test_promoting_an_ask_to_a_deny_is_a_tightening(tmp_path: Path):
+    """`deny` is stronger than `ask`, so this must not fail a security PR."""
+    result = run_guard(
+        tmp_path,
+        {S: {"permissions": {"ask": ["Bash(curl:*)"]}}},
+        {S: {"permissions": {"deny": ["Bash(curl:*)"]}}},
+    )
+    assert result.returncode == 0, result.stderr
+
+
+def test_downgrading_a_deny_to_an_ask_is_a_weakening(tmp_path: Path):
+    """The order only runs one way."""
+    result = run_guard(
+        tmp_path,
+        {S: {"permissions": {"deny": ["Bash(curl:*)"]}}},
+        {S: {"permissions": {"ask": ["Bash(curl:*)"]}}},
+    )
+    assert result.returncode == 1
+    assert 'deny: "Bash(curl:*)"' in result.stderr
+
+
+def test_dropping_plan_mode_is_a_weakening(tmp_path: Path):
+    """`plan` is stricter than the default it falls back to."""
+    result = run_guard(
+        tmp_path,
+        {S: {"permissions": {"defaultMode": "plan"}}},
+        {S: {"permissions": {}}},
+    )
+    assert result.returncode == 1, "dropping plan mode went undetected"
+    assert 'defaultMode: "plan"' in result.stderr
+
+
+def test_dropping_the_default_mode_is_not_a_weakening(tmp_path: Path):
+    """`default` is the baseline, so losing it changes nothing."""
+    result = run_guard(
+        tmp_path,
+        {S: {"permissions": {"defaultMode": "default"}}},
+        {S: {"permissions": {}}},
+    )
+    assert result.returncode == 0, result.stderr
+
+
+def test_keeping_plan_mode_passes(tmp_path: Path):
+    settings = {"permissions": {"defaultMode": "plan"}}
+    assert run_guard(tmp_path, {S: settings}, {S: settings}).returncode == 0
+
+
+def test_plan_to_bypass_is_both_a_new_grant_and_a_weakening(tmp_path: Path):
+    result = run_guard(
+        tmp_path,
+        {S: {"permissions": {"defaultMode": "plan"}}},
+        {S: {"permissions": {"defaultMode": "bypassPermissions"}}},
+    )
+    assert result.returncode == 1
+    assert 'defaultMode: "bypassPermissions"' in result.stderr
+    assert "weakens a restriction" in result.stderr
+
+
+def test_the_guard_works_from_a_subdirectory(tmp_path: Path):
+    """`git ls-tree -r` and `git ls-files` are both cwd-scoped.
+
+    Run from a subdirectory, the guard reported a repo clean while a grant sat
+    in the root settings file. It anchors itself to the repo root instead.
+    """
+    repo = tmp_path / "repo"
+    run_guard(tmp_path, {S: {"permissions": {}}}, {})
+    (repo / S).write_text(
+        '{"permissions": {"allow": ["Bash(rm:*)"]}}', encoding="utf-8"
+    )
+    _git(repo, "add", "-A")
+    sub = repo / "sub"
+    sub.mkdir()
+    result = subprocess.run(
+        ["bash", str(GUARD), "HEAD"], cwd=sub, capture_output=True, text=True
+    )
+    assert result.returncode == 1, "a root grant was invisible from a subdirectory"
+    assert 'allow: "Bash(rm:*)"' in result.stderr
+
+
+def test_a_grant_is_found_when_the_base_had_none_at_all(tmp_path: Path):
+    """An empty covering set is the awk `NR == FNR` trap.
+
+    With no grants at base, every head entry read as already-seen and passed.
+    """
+    result = run_guard(
+        tmp_path,
+        {S: {"permissions": {}}},
+        {S: {"permissions": {"allow": ["Bash(rm:*)"]}}},
+    )
+    assert result.returncode == 1, "a grant passed because base had none to compare"
+    assert 'allow: "Bash(rm:*)"' in result.stderr
+
+
+def test_a_deliberate_removal_can_be_overridden(tmp_path: Path):
+    """A deny whose rule went obsolete has to be deletable."""
+    repo = tmp_path / "repo"
+    run_guard(
+        tmp_path,
+        {S: {"permissions": {"deny": ["Bash(curl:*)"]}}},
+        {S: {"permissions": {}}},
+    )
+    result = subprocess.run(
+        ["bash", str(GUARD), "HEAD~0"],
+        cwd=repo,
+        capture_output=True,
+        text=True,
+        env=dict(os.environ, ALLOW_PERMISSION_WEAKENING="1"),
+    )
+    assert result.returncode == 0, result.stderr
+
+
+def test_the_override_does_not_excuse_an_added_grant(tmp_path: Path):
+    """A committed allow has no legitimate in-repo form, so nothing waives it."""
+    repo = tmp_path / "repo"
+    run_guard(tmp_path, {}, {S: {"permissions": {"allow": ["Bash(rm:*)"]}}})
+    result = subprocess.run(
+        ["bash", str(GUARD), "HEAD"],
+        cwd=repo,
+        capture_output=True,
+        text=True,
+        env=dict(os.environ, ALLOW_PERMISSION_WEAKENING="1"),
+    )
+    assert result.returncode == 1, "the override waived an added grant"
+
+
+# --- round six: two more restriction kinds, real ancestry, safe scope bytes
+
+
+DEEP = "packages/app/.claude/settings.json"
+MID = "packages/.claude/settings.json"
+
+
+def test_removing_the_bypass_mode_lock_is_a_weakening(tmp_path: Path):
+    """`disableBypassPermissionsMode` forbids the broadest mode outright."""
+    result = run_guard(
+        tmp_path,
+        {S: {"permissions": {"disableBypassPermissionsMode": "disable"}}},
+        {S: {"permissions": {}}},
+    )
+    assert result.returncode == 1
+    assert "disableBypassPermissionsMode" in result.stderr
+
+
+def test_re_permitting_a_disabled_mcp_server_is_a_weakening(tmp_path: Path):
+    result = run_guard(tmp_path, {S: {"disabledMcpjsonServers": ["evil"]}}, {S: {}})
+    assert result.returncode == 1
+    assert 'disabledMcpjsonServers: "evil"' in result.stderr
+
+
+def test_a_non_root_ancestor_covers_its_subtree(tmp_path: Path):
+    """Moving a deny from `packages/app` to `packages` covers strictly more.
+
+    A two-level model that only recognised the repo root reported this
+    tightening as a weakening.
+    """
+    deny = {"permissions": {"deny": ["Bash(curl:*)"]}}
+    result = run_guard(tmp_path, {DEEP: deny}, {DEEP: None, MID: deny})
+    assert result.returncode == 0, result.stderr
+
+
+def test_demoting_below_a_non_root_ancestor_is_a_weakening(tmp_path: Path):
+    deny = {"permissions": {"deny": ["Bash(curl:*)"]}}
+    result = run_guard(tmp_path, {MID: deny}, {MID: None, DEEP: deny})
+    assert result.returncode == 1
+    assert 'deny: "Bash(curl:*)"' in result.stderr
+
+
+def test_narrowing_a_grant_to_a_subtree_is_not_a_new_grant(tmp_path: Path):
+    """An allow at `packages` already covers `packages/app`."""
+    grant = {"permissions": {"allow": ["Bash(rm:*)"]}}
+    result = run_guard(tmp_path, {MID: grant}, {MID: None, DEEP: grant})
+    assert result.returncode == 0, result.stderr
+
+
+@pytest.mark.parametrize("dirname", ["a&b", "a|b", "a\\b"])
+def test_a_tightening_under_an_awkward_scope_name_passes(tmp_path: Path, dirname: str):
+    """The scope was spliced into a sed replacement, where `&` expands to the
+    match and `|` ends the expression -- the one path-byte class the byte-safe
+    enumeration work claimed to have closed.
+    """
+    path = f"{dirname}/.claude/settings.json"
+    result = run_guard(
+        tmp_path,
+        {path: {"permissions": {"ask": ["Bash(curl:*)"]}}},
+        {path: {"permissions": {"deny": ["Bash(curl:*)"]}}},
+    )
+    assert result.returncode == 0, result.stderr
+
+
+@pytest.mark.parametrize("dirname", ["a&b", "a|b", "a\\b"])
+def test_a_grant_under_an_awkward_scope_name_is_caught(tmp_path: Path, dirname: str):
+    path = f"{dirname}/.claude/settings.json"
+    result = run_guard(tmp_path, {}, {path: {"permissions": {"allow": ["Bash(rm:*)"]}}})
+    assert result.returncode == 1, "a grant under an awkward path name was missed"
     assert 'allow: "Bash(rm:*)"' in result.stderr
