@@ -111,12 +111,45 @@ Three properties hold the whole thing together:
 
 ## Installation
 
+### Upgrading from 0.3.0 or earlier
+
+The permission guard was a shell script through 0.3.0 and is Python from
+0.3.1. `pr-guards.yml` and the scripts it calls are committed to your project,
+so this is three small edits you make yourself.
+
+**Do not re-run `init` for this.** It is written for a fresh project or a
+migration from a different layout, and it rewrites `roadmap.md` and
+`docs/weak-spots.md` from blank templates, re-copies the `## Models` table over
+your tuned column, and overwrites `pr-guards.yml`. On a project that has been
+running, that destroys the feature index every other skill reads and the
+weak-spots the retros accumulated.
+
+Instead, in a Claude Code session in the project, after
+`claude plugin update agentic-workflow`:
+
+1. Copy `${CLAUDE_PLUGIN_ROOT}/templates/check_committed_permission_grants.py`
+   to `scripts/` and make it executable. That variable resolves inside a
+   session, which is the easiest way to find the installed plugin.
+2. In `.github/workflows/pr-guards.yml`, change the guard's `run:` line to
+   `python3 scripts/check_committed_permission_grants.py "$BASE_SHA"`, and
+   delete the `Ensure jq is available` step in that job if it is there.
+3. `git rm scripts/check_committed_permission_grants.sh`.
+
+Do them in one commit. Splitting them leaves the workflow calling a file that
+is not there, and the permission-grant job fails on every PR until the rest
+lands.
+
 ### Requirements
 
 - Claude Code with plugin support.
 - Python 3.10+ on `PATH` for the two bundled scripts (standard library only —
   nothing to install). A project with a managed environment prefixes them the
   way its own `CLAUDE.md` → Commands does (`poetry run`, `uv run`, …).
+- Python 3.10+ reachable as **`python3`** for the permission guard, which is a
+  different case: it is not run from the plugin but copied into your project by
+  `init`, and `pr-guards.yml` invokes it as `python3` on the CI runner. A
+  managed environment does not help there, so if your CI image has no `python3`
+  on `PATH`, add one to that job. It is stdlib-only too.
 - `git`, and `gh` or equivalent for the skills that open PRs and post review
   comments.
 
@@ -242,9 +275,11 @@ because a `deny` whose rule went obsolete has to be deletable, and setting that
 variable is itself a reviewable diff. **An added grant has no override**, since
 it has no legitimate in-repo form.
 
-And it **fails closed**: a settings file it cannot parse, or a runner without
-`jq`, is an error rather than a pass, because a control that reports success on
-input it could not read is worse than no control at all.
+And it **fails closed**: a settings file it cannot parse is an error rather
+than a pass, because a control that reports success on input it could not read
+is worse than no control at all. It is stdlib Python, like this plugin's other
+two bundled scripts, so it needs no `jq` and adds no dependency beyond the
+Python they already require.
 
 ---
 
@@ -281,7 +316,7 @@ docs/
   weak-spots.md                # capped at 30; only the retro skill writes it
   roadmap_changelog.md
 .github/workflows/pr-guards.yml
-scripts/check_committed_permission_grants.sh
+scripts/check_committed_permission_grants.py
 scripts/check_review_coverage.sh
 ```
 
@@ -459,7 +494,7 @@ your project is ever regenerated from here.
 | `templates/models.md` | `CLAUDE.md` → `## Models` | The tier table, floors and "go one up" triggers. **The only copy** — the skills and this README point here rather than restating it |
 | `templates/agents-sections.md` | appended to `AGENTS.md` | The three `##` headings read *by name* by the skills and both reviewer agents: Domain rules for code review, Release model, Weak spots. Most of the content is yours and grows over time, except `## Weak spots` in full and `## Release model`'s four floor bullets, which are fixed by the method — `tests/test_bundled_copies.py` pins `fixture/AGENTS.md`'s copy of those to this template |
 | `templates/pr-guards.yml` | `.github/workflows/pr-guards.yml` | All three jobs, not just one: a gitleaks secret scan on the PR's own commits, the committed-permission-grant guard, and review coverage |
-| `templates/check_committed_permission_grants.sh` | `scripts/` (executable) | Fails a PR that widens what an agent may do without asking, in any tracked `.claude/settings*.json` at any depth: an added `allow`, `additionalDirectories`, non-`default`/`plan` `defaultMode` or MCP auto-approval, **or a weakened `deny`/`ask`/`plan` restriction**. Tightening passes. Fails closed on a file it cannot parse, or a runner with no `jq` |
+| `templates/check_committed_permission_grants.py` | `scripts/` (executable) | Fails a PR that widens what an agent may do without asking, in any tracked `.claude/settings*.json` at any depth: an added `allow`, `additionalDirectories`, non-`default`/`plan` `defaultMode` or MCP auto-approval, **or a weakened `deny`/`ask`/`plan` restriction**. Tightening passes. Stdlib-only, so it needs no `jq`, and fails closed on a file it cannot parse |
 | `templates/check_review_coverage.sh` | `scripts/` (executable) | Fails a PR whose head has not had both review reports posted |
 
 `init` also writes, with no template: `CLAUDE.md` → `## Commands` (your
@@ -572,14 +607,15 @@ contract rather than to prose:
 
 1. Make the edit.
 2. Run the tests **from the repo root**, not from here: `pytest` (needs only
-   pytest — both bundled scripts are stdlib-only). They cover the two scripts
+   pytest — everything under test is stdlib-only). They cover the two scripts
    the skills execute, and one of them runs the layout check against
    `fixture/`, so a break in either the checker or the fixture fails here. A
-   third pins the guard script the repo runs from `scripts/` byte-for-byte
-   against the copy `init` ships from this plugin's `templates/`, so editing
-   one and not the other fails rather than silently handing consumers a
-   different guard. A fourth checks the `plugins/` layout itself. CI runs the
-   same thing on every PR.
+   third covers the permission guard directly, building throwaway repositories
+   and asserting its verdicts, and pins the copy the repo runs from `scripts/`
+   byte-for-byte against the one `init` ships from `templates/`, so editing one
+   and not the other fails rather than silently handing consumers a different
+   guard. A fourth checks the `plugins/` layout itself. CI runs the same thing
+   on every PR.
 3. Run the skill you changed against `fixture/` in a session started with
    `claude --plugin-dir /path/to/AxiomaSkills/plugins/agentic-workflow`. See
    [fixture/README.md](https://github.com/AxiomaBot/AxiomaSkills/blob/main/fixture/README.md).

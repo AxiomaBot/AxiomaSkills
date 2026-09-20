@@ -1,6 +1,6 @@
 name: CI
 
-# The two bundled scripts are what the `workflow` and `pr-review` skills
+# The three bundled scripts are what the `workflow` and `pr-review` skills
 # actually execute inside every consuming project, so they are the one part of
 # this repo that can break someone else's build silently. They are stdlib-only,
 # so this needs no lockfile — just pytest and ruff.
@@ -52,18 +52,7 @@ jobs:
 
       - run: pip install pytest==8.4.2
 
-      - name: Ensure jq is available
-        # tests/test_permission_grant_guard.py skips itself without jq, so a
-        # runner image that drops jq would leave the guard with zero coverage
-        # and CI still green — the exact assumption this repo removed from the
-        # guard's own workflows.
-        run: |
-          if ! command -v jq >/dev/null 2>&1; then
-            sudo apt-get update && sudo apt-get install -y jq
-          fi
-          jq --version
-
-      # Covers both bundled scripts, and — through the layout check running
+      # Covers all three bundled scripts, and — through the layout check running
       # against `fixture/` — that the shipped fixture project still satisfies
       # the contract the skills read it against.
       - run: pytest -q
