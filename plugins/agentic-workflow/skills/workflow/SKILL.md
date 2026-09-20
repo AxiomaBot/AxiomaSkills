@@ -91,10 +91,11 @@ Then, in order:
 3. Install the whole `pr-guards.yml` from
    `${CLAUDE_PLUGIN_ROOT}/templates/pr-guards.yml` to
    `.github/workflows/pr-guards.yml`, and its two scripts from
-   `${CLAUDE_PLUGIN_ROOT}/templates/check_committed_permission_grants.sh` and
+   `${CLAUDE_PLUGIN_ROOT}/templates/check_committed_permission_grants.py` and
    `${CLAUDE_PLUGIN_ROOT}/templates/check_review_coverage.sh` to
-   `scripts/check_committed_permission_grants.sh` and
-   `scripts/check_review_coverage.sh` (executable) — gitleaks on the PR's
+   `scripts/check_committed_permission_grants.py` and
+   `scripts/check_review_coverage.sh` (the `.sh` one executable; the guard is
+   run as `python3 <path>` and is stdlib-only) — gitleaks on the PR's
    commits, the committed-permission-grant guard, and review coverage. All
    three, not only review coverage — the first two are the deterministic
    floor under everything the agents do. This workflow and these two scripts

@@ -94,8 +94,8 @@ def _table_tiers(text: str) -> tuple[str, ...]:
     ("ours", "shipped"),
     [
         (
-            "scripts/check_committed_permission_grants.sh",
-            "plugins/agentic-workflow/templates/check_committed_permission_grants.sh",
+            "scripts/check_committed_permission_grants.py",
+            "plugins/agentic-workflow/templates/check_committed_permission_grants.py",
         ),
     ],
 )

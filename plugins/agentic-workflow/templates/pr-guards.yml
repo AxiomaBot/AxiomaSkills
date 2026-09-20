@@ -80,33 +80,22 @@ jobs:
   no-committed-permission-grants:
     name: No committed permission grants
     runs-on: ubuntu-latest
-    # pull_request-only: needs the actual diff, which issue_comment doesn't carry.
+    # pull_request-only: it must inspect the PR's head tree, and an
+    # issue_comment checkout lands on the default branch instead.
     if: github.event_name == 'pull_request' && github.event.pull_request.draft == false
     steps:
-      - name: Checkout (full history to diff against base)
-        uses: actions/checkout@v7
-        with:
-          fetch-depth: 0
+      # A shallow checkout is enough: the guard inspects the PR's own tree and
+      # compares against nothing, so it needs no history and no base ref.
+      - uses: actions/checkout@v7
 
-      - name: Ensure jq is available
-        # The guard fails closed without jq, which is correct but would read as
-        # a mystery failure. ubuntu-latest ships it; this keeps the job honest
-        # on any runner that does not.
-        run: |
-          if ! command -v jq >/dev/null 2>&1; then
-            sudo apt-get update && sudo apt-get install -y jq
-          fi
-          jq --version
-
-      - name: Fail on widened permissions in any tracked settings file
-        env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-        # The guard enumerates every tracked .claude/settings*.json (base ∪
-        # head) so a newly-added settings file can't slip a grant past it. The
-        # logic sits in a script rather than inline here so it can be run and
-        # tested directly from a shell, and so this project and the plugin that
-        # ships it run the identical copy.
-        run: bash scripts/check_committed_permission_grants.sh "$BASE_SHA"
+      - name: Fail on any permission grant in a tracked settings file
+        # The guard enumerates every tracked .claude/settings*.json and fails
+        # on any permission grant it finds — no base comparison, so a grant
+        # that predates this workflow is caught too. The logic sits in a
+        # script rather than inline here so it can be run and tested directly
+        # from a shell, and so this project and the plugin that ships it run
+        # the identical copy.
+        run: python3 scripts/check_committed_permission_grants.py
 
   review-coverage:
     name: Review coverage
