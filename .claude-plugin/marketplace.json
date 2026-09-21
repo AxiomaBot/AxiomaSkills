@@ -9,6 +9,11 @@
       "name": "agentic-workflow",
       "description": "Per-feature, trunk-based agentic build workflow: roadmap and chunk planning, unattended build, fresh diff-only PR review (quality + security), and a retro that defaults to no change.",
       "source": "./plugins/agentic-workflow"
+    },
+    {
+      "name": "writer",
+      "description": "A single portable agent that writes, rewrites or summarises prose in a plain, honest, peer-to-peer voice - for evidence records, analysis notes, CV and cover-letter paragraphs, orientation summaries, and correspondence. Reads a project's writing-style.md as an authoritative overlay on its built-in method.",
+      "source": "./plugins/writer"
     }
   ]
 }

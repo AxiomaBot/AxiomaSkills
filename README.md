@@ -6,6 +6,7 @@ A personal marketplace of Claude Code plugins. One plugin per directory under
 | Plugin | What it is |
 |--------|-----------|
 | [`agentic-workflow`](plugins/agentic-workflow/) | An opinionated way to build software with agents: you supply product judgment and manual testing, agents do the planning, coding, reviewing and bookkeeping. Nine skills and two reviewer agents. [Operator's manual](plugins/agentic-workflow/README.md) |
+| [`writer`](plugins/writer/) | A single agent that writes, rewrites or summarises prose in a plain, peer-to-peer voice — evidence records, analysis notes, CV and cover-letter paragraphs, orientation summaries, correspondence. Reads a project's `writing-style.md` as an override. [Details](plugins/writer/README.md) |
 
 Each plugin is versioned and installed **independently**. Adding one never
 forces a version bump on the others.
