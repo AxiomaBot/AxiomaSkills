@@ -1,0 +1,8 @@
+{
+  "name": "writer",
+  "description": "A single portable agent that writes, rewrites or summarises prose in a plain, honest, peer-to-peer voice - for evidence records, analysis notes, CV and cover-letter paragraphs, orientation summaries, and correspondence. Reads a project's writing-style.md as an authoritative overlay on its built-in method.",
+  "version": "0.1.0",
+  "author": {
+    "name": "AxiomaBot"
+  }
+}
