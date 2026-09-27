@@ -8,9 +8,8 @@ file; it never edits the project.
 
 What it reads:
 
-* ``roadmap.md`` -- the H1 for the project name, then the ``## Done`` rows and
-  the ``## Features`` rows, each in table order. That order is the roadmap's
-  own sequence, so the page keeps it.
+* ``roadmap.md`` -- the H1 for the project name, the ``## Done`` rows, and the
+  ``## Features`` rows with their optional ``After`` column.
 * ``docs/features/<slug>/feature.md`` for every row that links a folder: the
   frontmatter ``status`` (shown when it disagrees with the roadmap row) and
   ``depends-on``, the task boxes under each chunk heading, and the sign-off
@@ -18,10 +17,21 @@ What it reads:
 * ``docs/features/<slug>/manual_tests.md``: the top-level ``- [ ]`` and
   ``- [x]`` items under each ``##`` checkpoint heading, and its sign-off line.
 
-A dependency is met when its feature is ``built`` or ``done``, or, for a
-``<feature>/<chunk>`` entry, when every task box under that chunk's heading is
-ticked. A bare ``<feature>`` entry waits for the whole feature. Only features
-with a folder carry ``depends-on``, so an ``outlined`` feature has no edges.
+What a feature waits on is its ``depends-on`` entries plus its ``After``
+entries, each feature counted once. A ``<feature>/<chunk>`` entry is met when
+every task box under that chunk's heading is ticked or its feature is
+``built`` or ``done``; a bare ``<feature>`` entry waits for the whole feature.
+
+The page has two parts. **Shipped** lists the ``## Done`` rows in table order.
+**Ahead** lays the other rows out in waves: wave 1 is every feature with
+nothing unmet to wait on, and each later wave waits on something in an
+earlier one, so features in the same wave can be built in parallel. Lines
+join a feature to the features it waits on within Ahead; what it waits on
+from Shipped is met by definition and shown only as a chip. A roadmap with no
+``After`` column has declared no order between outlined features, so Ahead
+falls back to table order, one feature per row, and says so. A cycle cannot
+hang the layout: a feature met again while its own wave is being worked out
+counts as wave 1 (``workflow check`` reports the cycle itself).
 
 The table, section and frontmatter parsers are the ``workflow`` skill's own,
 loaded from ``workflow_check.py`` by path, so anything the layout check
@@ -32,7 +42,8 @@ printed from the repository or the arguments is HTML-escaped.
 
 Exit status is 0 when the page was written and 2 on a usage error: no
 ``roadmap.md``, or a ``--target`` or ``--note`` naming a feature the page does
-not show.
+not show. ``--target`` ends the page at that row of ``## Features``; rows
+after it in the table are left off.
 
 Usage::
 
@@ -110,6 +121,7 @@ class Feature:
     line: str
     link: str | None = None
     shipped: str | None = None
+    after: list[str] = field(default_factory=list)
     folder_status: str | None = None
     checkpoints: list[Checkpoint] = field(default_factory=list)
     signed_off: str | None = None
@@ -119,51 +131,42 @@ class Feature:
 
     @property
     def kind(self) -> str:
-        """The status as one of ``STATUSES``; a cell like ``building (paused)``
-        styles as ``building``, and anything unrecognised as ``idea``."""
-        words = self.status.split()
-        word = words[0].lower() if words else ""
-        return word if word in wc.STATUSES else "idea"
+        """The status as one of ``STATUSES``; anything else styles as ``idea``."""
+        status = self.status.lower()
+        return status if status in wc.STATUSES else "idea"
 
 
 @dataclass
 class Page:
     project: str
     features: list[Feature]
+    ordered: bool = False
+    """True when ``## Features`` has an ``After`` column to lay waves out by."""
     target: str | None = None
 
 
-def table_rows(text: str) -> list[list[str]]:
-    """Body rows of the first Markdown table in ``text``, as stripped cells."""
-    rows: list[list[str]] = []
-    for line in text.splitlines():
-        stripped = line.strip()
-        if not stripped.startswith("|"):
-            if rows:
-                break
-            continue
-        rows.append([cell.strip() for cell in stripped.strip("|").split("|")])
-    return [row for row in rows[1:] if not all(set(cell) <= set("-: ") for cell in row)]
+def _cell(row: dict[str, str], key: str, position: int) -> str:
+    """A cell by header name, falling back to its usual position."""
+    if key in row:
+        return row[key]
+    values = list(row.values())
+    return values[position] if len(values) > position else ""
 
 
-def _row(cells: list[str], status: str | None) -> Feature | None:
-    if not cells or not cells[0]:
+def _feature(row: dict[str, str], done: bool) -> Feature | None:
+    first = _cell(row, "feature", 0)
+    if not first:
         return None
-    link_match = wc.ROW_LINK.match(cells[0])
-    if link_match:
-        name, link = link_match.group(1), link_match.group(2)
-        slug = wc.slug_of(link)
-    else:
-        name, link = cells[0].strip("`"), None
-        slug = name
-    second = cells[1] if len(cells) > 1 else ""
+    link_match = wc.ROW_LINK.match(first)
+    name = link_match.group(1) if link_match else first.strip("`")
     return Feature(
-        slug=slug,
+        slug=wc.row_slug(first),
         name=name,
-        status=status if status is not None else second,
-        shipped=second if status is not None else None,
-        line=cells[2] if len(cells) > 2 else "",
-        link=link,
+        status="done" if done else _cell(row, "status", 1),
+        shipped=_cell(row, "shipped", 1) if done else None,
+        line=_cell(row, "one line", 2),
+        link=link_match.group(2) if link_match else None,
+        after=[] if done else wc.after_entries(row.get("after", "")),
     )
 
 
@@ -245,28 +248,31 @@ def chunk_ticked(feature_text: str, number: str) -> bool:
 
 
 def _read_folder(root: Path, feature: Feature) -> None:
-    if feature.link is None:
-        return
-    folder = root / feature.link
-    if folder.suffix.lower() == ".md":
-        folder = folder.parent
-    feature_md = folder / "feature.md"
-    if feature_md.is_file():
-        text = feature_md.read_text(encoding="utf-8")
-        feature.text = text
-        try:
-            meta = wc.frontmatter(text) or {}
-        except wc.MalformedFrontmatter:
-            meta = {}
-        feature.folder_status = meta.get("status") or None
-        feature.depends = dependencies(meta.get("depends-on", ""))
-        test_section = wc.sections(text, 2).get("test checkpoint", "")
-        feature.signed_off = sign_off(test_section)
-    manual = folder / "manual_tests.md"
-    if manual.is_file():
-        manual_text = manual.read_text(encoding="utf-8")
-        feature.checkpoints = checkpoints(manual_text)
-        feature.signed_off = feature.signed_off or sign_off(manual_text)
+    if feature.link is not None:
+        folder = root / feature.link
+        if folder.suffix.lower() == ".md":
+            folder = folder.parent
+        feature_md = folder / "feature.md"
+        if feature_md.is_file():
+            text = feature_md.read_text(encoding="utf-8")
+            feature.text = text
+            try:
+                meta = wc.frontmatter(text) or {}
+            except wc.MalformedFrontmatter:
+                meta = {}
+            feature.folder_status = meta.get("status") or None
+            feature.depends = dependencies(meta.get("depends-on", ""))
+            test_section = wc.sections(text, 2).get("test checkpoint", "")
+            feature.signed_off = sign_off(test_section)
+        manual = folder / "manual_tests.md"
+        if manual.is_file():
+            manual_text = manual.read_text(encoding="utf-8")
+            feature.checkpoints = checkpoints(manual_text)
+            feature.signed_off = feature.signed_off or sign_off(manual_text)
+    named = {dep.slug for dep in feature.depends}
+    feature.depends += [
+        Dependency(slug, slug, None) for slug in feature.after if slug not in named
+    ]
 
 
 def _resolve(features: list[Feature]) -> None:
@@ -294,24 +300,21 @@ def build(
     heading = PROJECT_H1.search(text)
     project = heading.group(1) if heading else root.resolve().name
     parts = wc.sections(text, 2)
+    feature_rows = wc.table(parts.get("features", ""))
     features = [
         feature
-        for cells in table_rows(parts.get("done", ""))
-        if (feature := _row(cells, "done"))
-    ] + [
-        feature
-        for cells in table_rows(parts.get("features", ""))
-        if (feature := _row(cells, None))
-    ]
+        for row in wc.table(parts.get("done", ""))
+        if (feature := _feature(row, done=True))
+    ] + [feature for row in feature_rows if (feature := _feature(row, done=False))]
     for feature in features:
         _read_folder(root, feature)
     _resolve(features)
 
-    page = Page(project, features)
+    page = Page(project, features, ordered=any("after" in row for row in feature_rows))
     if target is not None:
         slugs = [feature.slug for feature in features]
-        if target not in slugs:
-            raise UsageError(f"--target `{target}` is not a feature on the roadmap")
+        if target not in slugs or features[slugs.index(target)].kind == "done":
+            raise UsageError(f"--target `{target}` is not a row in `## Features`")
         page.features = features[: slugs.index(target) + 1]
         page.target = target
         for feature in page.features:
@@ -324,6 +327,36 @@ def build(
             raise UsageError(f"--note `{slug}` is not a feature on this page")
         shown[slug].note = note
     return page
+
+
+def waves(page: Page) -> list[list[int]]:
+    """Indices of the features ahead, grouped into waves (see the docstring)."""
+    features = page.features
+    ahead = [i for i, feature in enumerate(features) if feature.kind != "done"]
+    if not page.ordered:
+        return [[i] for i in ahead]
+    level: dict[int, int] = {}
+
+    def level_of(i: int, seen: frozenset[int]) -> int:
+        if i in level:
+            return level[i]
+        if i in seen:
+            return 0
+        blockers = [
+            dep.upstream
+            for dep in features[i].depends
+            if dep.upstream is not None
+            and not dep.met
+            and features[dep.upstream].kind != "done"
+        ]
+        value = 1 + max((level_of(up, seen | {i}) for up in blockers), default=-1)
+        level[i] = value
+        return value
+
+    grouped: dict[int, list[int]] = {}
+    for i in ahead:
+        grouped.setdefault(level_of(i, frozenset()), []).append(i)
+    return [grouped[key] for key in sorted(grouped)]
 
 
 def inline(text: str) -> str:
@@ -340,16 +373,6 @@ def _pill(feature: Feature, is_target: bool) -> str:
     css = "done" if kind == "done" else "flight" if kind in IN_FLIGHT else "later"
     label = "Done" if kind == "done" else feature.status or kind
     return f'<span class="pill {css}">{html.escape(label)}</span>'
-
-
-def _node(feature: Feature, position: int, is_target: bool) -> str:
-    if is_target:
-        return "&#9873;"
-    if feature.kind == "done":
-        return "&#10003;"
-    if feature.kind in IN_FLIGHT:
-        return "&#9679;"
-    return str(position + 1)
 
 
 def _checkpoint_html(feature: Feature) -> str:
@@ -384,7 +407,7 @@ def _checkpoint_html(feature: Feature) -> str:
     )
 
 
-def _deps_html(feature: Feature) -> str:
+def _after_html(feature: Feature) -> str:
     if not feature.depends:
         return ""
     chips = []
@@ -397,18 +420,19 @@ def _deps_html(feature: Feature) -> str:
         else:
             chips.append(f'<span class="chip wait">{label} &middot; waiting</span>')
     return (
-        '<div class="deps"><span class="deps-label">Depends on</span>'
+        '<div class="after"><span class="after-label">After</span>'
         + "".join(chips)
         + "</div>"
     )
 
 
-def _stage(feature: Feature, position: int, focus: set[int], target: bool) -> str:
-    classes = ["stage", f"k-{feature.kind}"]
-    if position in focus:
+def _card(feature: Feature, position: int, focus: bool, target: bool) -> str:
+    classes = ["card", f"k-{feature.kind}"]
+    if focus:
         classes.append("focus")
     if target:
         classes.append("target")
+    done = feature.kind == "done"
     mismatch = ""
     if feature.folder_status and feature.folder_status != feature.kind:
         mismatch = (
@@ -422,15 +446,23 @@ def _stage(feature: Feature, position: int, focus: set[int], target: bool) -> st
     )
     note = f'<p class="note">{inline(feature.note)}</p>' if feature.note else ""
     line = f'<p class="line">{inline(feature.line)}</p>' if feature.line else ""
+    after = "" if done else _after_html(feature)
     return (
-        f'<div class="{" ".join(classes)}">'
-        f'<div class="node" aria-hidden="true">{_node(feature, position, target)}</div>'
-        '<div class="card"><div class="card-top">'
+        f'<article class="{" ".join(classes)}" data-i="{position}">'
+        '<div class="card-top">'
         f'<span class="name">{html.escape(feature.name)}</span>'
         f"{_pill(feature, target)}</div>"
-        f"{line}{mismatch}{_deps_html(feature)}{_checkpoint_html(feature)}"
-        f"{note}{shipped}</div></div>"
+        f"{line}{mismatch}{after}{_checkpoint_html(feature)}{note}{shipped}"
+        "</article>"
     )
+
+
+def _wave_label(number: int, size: int, ordered: bool) -> str:
+    if not ordered:
+        return ""
+    lead = "Can start now" if number == 1 else f"Wave {number}"
+    tail = f" &middot; {size} in parallel" if size > 1 else ""
+    return f'<p class="wave-label">{lead}{tail}</p>'
 
 
 def render(
@@ -444,18 +476,18 @@ def render(
     """The page as HTML; a full document unless ``fragment`` is set."""
     features = page.features
     total = len(features)
-    done = sum(feature.kind == "done" for feature in features)
+    done = [i for i, f in enumerate(features) if f.kind == "done"]
     flight = [i for i, f in enumerate(features) if f.kind in IN_FLIGHT]
-    upcoming = [i for i, f in enumerate(features) if f.kind != "done"]
-    focus = set(flight or upcoming[:1])
+    grouped = waves(page)
+    focus = set(flight or (grouped[0] if grouped else []))
 
-    edges = [
-        {"from": dep.upstream, "to": position, "met": dep.met}
-        for position, feature in enumerate(features)
-        for dep in feature.depends
-        if dep.upstream is not None and dep.upstream != position
+    ahead = {i for wave in grouped for i in wave}
+    links = [
+        {"from": dep.upstream, "to": i, "met": dep.met}
+        for i in sorted(ahead)
+        for dep in features[i].depends
+        if dep.upstream in ahead and dep.upstream != i
     ]
-    gutter = 56 if edges else 0
 
     segments = "".join(
         '<span class="seg '
@@ -463,21 +495,51 @@ def render(
         + f'" title="{html.escape(f.name)}"></span>'
         for f in features
     )
+    shipped_html = ""
+    if done:
+        shipped_html = (
+            '<section class="part"><h2>Shipped</h2><div class="shipped">'
+            + "".join(_card(features[i], i, False, False) for i in done)
+            + "</div></section>"
+        )
+    ahead_html = ""
+    if grouped:
+        fallback = (
+            ""
+            if page.ordered
+            else '<p class="hint">roadmap.md has no <code>After</code> column, so '
+            "this is table order, not a dependency order. Add one to show what "
+            "can be built in parallel.</p>"
+        )
+        legend = (
+            '<p class="hint"><svg width="46" height="10" aria-hidden="true">'
+            '<path class="link met" d="M2 5 H20"/>'
+            '<path class="link wait" d="M26 5 H44"/></svg>'
+            "Lines run from a feature to the ones waiting on it: solid when met, "
+            "dashed while waiting.</p>"
+            if links
+            else ""
+        )
+        rows = "".join(
+            '<div class="wave">'
+            + _wave_label(number, len(wave), page.ordered)
+            + '<div class="wave-cards">'
+            + "".join(
+                _card(features[i], i, i in focus, features[i].slug == page.target)
+                for i in wave
+            )
+            + "</div></div>"
+            for number, wave in enumerate(grouped, 1)
+        )
+        ahead_html = (
+            f'<section class="part"><h2>Ahead</h2>{fallback}{legend}'
+            f'<div class="waves"><svg class="links" aria-hidden="true"></svg>'
+            f"{rows}</div></section>"
+        )
+
     title = f"{page.project} Roadmap"
-    lead = headline or f"{done} of {total} features done."
+    lead = headline or f"{len(done)} of {total} features done."
     dek = f'<p class="dek">{inline(summary)}</p>' if summary else ""
-    legend = (
-        '<p class="legend"><svg width="46" height="10" aria-hidden="true">'
-        '<path class="arc met" d="M2 5 H20"/><path class="arc wait" d="M26 5 H44"/>'
-        "</svg>Arcs join a feature to what it depends on: solid is met, "
-        "dashed is still waiting.</p>"
-        if edges
-        else ""
-    )
-    stages = "".join(
-        _stage(feature, i, focus, feature.slug == page.target)
-        for i, feature in enumerate(features)
-    )
     body = (
         f"<title>{html.escape(title)}</title>\n"
         f"{FONTS}\n<style>{CSS}</style>\n"
@@ -486,16 +548,14 @@ def render(
         f"<h1>{inline(lead)}</h1>{dek}"
         '<section class="progress" aria-label="Overall progress">'
         '<div class="progress-head"><span class="label">Features</span>'
-        f'<span class="count"><b>{done}</b> of {total} done'
+        f'<span class="count"><b>{len(done)}</b> of {total} done'
         f" &middot; {len(flight)} in flight</span></div>"
         f'<div class="segments" style="--n:{max(total, 1)}">{segments}</div>'
-        f"</section>{legend}"
-        f'<div class="timeline" style="--gutter:{gutter}px">'
-        f'<svg class="arcs" aria-hidden="true"></svg>{stages}</div>'
+        f"</section>{shipped_html}{ahead_html}"
         "<footer><span>From roadmap.md and docs/features/</span>"
         f"<span>{html.escape(generated)}</span></footer></main>\n"
-        '<script type="application/json" id="progress-edges">'
-        f"{json.dumps(edges)}</script>\n"
+        '<script type="application/json" id="progress-links">'
+        f"{json.dumps(links)}</script>\n"
         f"<script>{JS}</script>\n"
     )
     if fragment:
@@ -520,7 +580,7 @@ CSS = """
   --border: #d7dcd8; --text: #1b211d; --text-muted: #5b655e;
   --accent: #b45f24; --accent-ink: #7a3f13; --accent-soft: #f1dcc7;
   --success: #2f7d5c; --success-soft: #d9ece2;
-  --warn: #8a6d00; --warn-soft: #f5ecc4; --spine: #c3cac4;
+  --warn: #8a6d00; --warn-soft: #f5ecc4;
   color-scheme: light;
 }
 @media (prefers-color-scheme: dark) {
@@ -529,7 +589,7 @@ CSS = """
     --border: #303a33; --text: #eef1ee; --text-muted: #97a29a;
     --accent: #e2934f; --accent-ink: #f4b878; --accent-soft: #3a2c1c;
     --success: #59c393; --success-soft: #1c3327;
-    --warn: #e6c65c; --warn-soft: #36301a; --spine: #3a443c;
+    --warn: #e6c65c; --warn-soft: #36301a;
     color-scheme: dark;
   }
 }
@@ -538,7 +598,7 @@ CSS = """
   --border: #303a33; --text: #eef1ee; --text-muted: #97a29a;
   --accent: #e2934f; --accent-ink: #f4b878; --accent-soft: #3a2c1c;
   --success: #59c393; --success-soft: #1c3327;
-  --warn: #e6c65c; --warn-soft: #36301a; --spine: #3a443c;
+  --warn: #e6c65c; --warn-soft: #36301a;
   color-scheme: dark;
 }
 * { box-sizing: border-box; }
@@ -547,13 +607,13 @@ body {
   font: 14px/1.5 'IBM Plex Sans', system-ui, -apple-system, sans-serif;
   padding: 40px 16px 64px;
 }
-.page { max-width: 760px; margin: 0 auto; }
+.page { max-width: 820px; margin: 0 auto; }
 code {
   font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: .92em;
   background: var(--surface-muted); padding: 0 .3em; border-radius: 4px;
 }
-.eyebrow, .label, .cp-title, .deps-label, .pill, .meta, .count, .node,
-.cp-count, footer {
+.eyebrow, .label, .cp-title, .after-label, .pill, .meta, .count, .cp-count,
+.wave-label, h2, footer {
   font-family: 'IBM Plex Mono', ui-monospace, monospace;
 }
 .eyebrow {
@@ -564,10 +624,14 @@ h1 {
   font-size: clamp(26px, 5vw, 36px); line-height: 1.12; margin: 8px 0 10px;
   letter-spacing: -.01em; text-wrap: balance;
 }
+h2 {
+  font-size: 12px; font-weight: 600; letter-spacing: .12em;
+  text-transform: uppercase; color: var(--text-muted); margin: 0 0 12px;
+}
 .dek { color: var(--text-muted); font-size: 15px; max-width: 60ch; margin: 0 0 24px; }
 .progress {
   background: var(--surface); border: 1px solid var(--border);
-  border-radius: 12px; padding: 16px 18px; margin: 8px 0 14px;
+  border-radius: 12px; padding: 16px 18px; margin: 8px 0 0;
 }
 .progress-head {
   display: flex; justify-content: space-between; align-items: baseline;
@@ -588,57 +652,46 @@ h1 {
 }
 .seg.done { background: var(--success); border-color: var(--success); }
 .seg.flight { background: var(--accent); border-color: var(--accent); }
-.legend {
-  display: flex; align-items: center; gap: 8px; margin: 0 0 22px;
+.part { margin-top: 36px; }
+.shipped { display: flex; flex-direction: column; gap: 10px; }
+.hint {
+  display: flex; align-items: center; gap: 8px; margin: -4px 0 14px;
   font-size: 12px; color: var(--text-muted);
 }
-.timeline {
-  position: relative; margin-top: 30px;
-  padding-left: calc(var(--gutter, 0px) + 34px);
+.waves { position: relative; display: flex; flex-direction: column; gap: 40px; }
+.links {
+  position: absolute; left: 0; top: 0; overflow: visible; pointer-events: none;
 }
-.arcs { position: absolute; left: 0; top: 0; overflow: visible; }
-.arc { fill: none; stroke-width: 1.6; }
-.arc.met { stroke: var(--success); }
-.arc.wait { stroke: var(--accent); stroke-dasharray: 4 3; }
-.arc-end.met { fill: var(--success); }
-.arc-end.wait { fill: var(--accent); }
-.stage { position: relative; padding-bottom: 26px; }
-.stage::before {
-  content: ""; position: absolute; left: -24px; top: 28px; bottom: -2px;
-  width: 2px; background: var(--spine);
+.link { fill: none; stroke-width: 1.4; }
+.link.met { stroke: var(--success); }
+.link.wait { stroke: var(--accent); stroke-dasharray: 4 3; }
+.link-end.met { fill: var(--success); }
+.link-end.wait { fill: var(--accent); }
+.wave { position: relative; }
+.wave-label {
+  position: relative; display: inline-block; margin: 0 0 8px;
+  padding-right: 8px; background: var(--bg); font-size: 11px;
+  letter-spacing: .06em; text-transform: uppercase; color: var(--text-muted);
 }
-.stage.k-done::before { background: var(--success); }
-.stage:last-child { padding-bottom: 0; }
-.stage:last-child::before { display: none; }
-.node {
-  position: absolute; left: -34px; top: 4px; width: 22px; height: 22px;
-  border-radius: 50%; display: flex; align-items: center; justify-content: center;
-  font-size: 10px; color: var(--text-muted); background: var(--surface);
-  border: 2px solid var(--spine);
-}
-.k-done .node {
-  background: var(--success); border-color: var(--success);
-  color: var(--success-soft);
-}
-.k-planned .node, .k-building .node, .k-built .node {
-  background: var(--accent); border-color: var(--accent); color: var(--accent-soft);
-}
-.stage.target .node {
-  background: var(--text); border-color: var(--text); color: var(--bg);
+.wave-cards {
+  display: grid; gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
 }
 .card {
-  background: var(--surface); border: 1px solid var(--border);
-  border-radius: 10px; padding: 14px 16px;
+  position: relative; background: var(--surface);
+  border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px;
   display: flex; flex-direction: column; gap: 8px;
 }
-.stage.focus .card {
+.card.focus {
   border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent);
 }
+.card.target { border-color: var(--text); }
 .card-top {
   display: flex; justify-content: space-between; align-items: center;
   flex-wrap: wrap; gap: 8px;
 }
-.name { font-weight: 600; font-size: 15.5px; overflow-wrap: anywhere; }
+.name { font-weight: 600; font-size: 15px; overflow-wrap: anywhere; }
+.k-done .name::before { content: "\\2713  "; color: var(--success); }
 .line { margin: 0; color: var(--text-muted); font-size: 13.5px; }
 .pill {
   font-size: 10.5px; font-weight: 600; letter-spacing: .06em;
@@ -653,24 +706,15 @@ h1 {
 }
 .pill.target { background: var(--text); color: var(--bg); }
 .meta { margin: 0; font-size: 11px; color: var(--text-muted); }
-.deps { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
-.deps-label { font-size: 11px; color: var(--text-muted); }
+.after { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.after-label { font-size: 11px; color: var(--text-muted); }
 .chip {
   font-size: 12px; padding: 2px 8px; border-radius: 6px;
-  border: 1px solid var(--border); overflow-wrap: anywhere;
+  border: 1px solid transparent; overflow-wrap: anywhere;
 }
-.chip.met {
-  color: var(--success); background: var(--success-soft);
-  border-color: transparent;
-}
-.chip.wait {
-  color: var(--accent-ink); background: var(--accent-soft);
-  border-color: transparent;
-}
-.chip.warn {
-  align-self: flex-start; color: var(--warn); background: var(--warn-soft);
-  border-color: transparent;
-}
+.chip.met { color: var(--success); background: var(--success-soft); }
+.chip.wait { color: var(--accent-ink); background: var(--accent-soft); }
+.chip.warn { align-self: flex-start; color: var(--warn); background: var(--warn-soft); }
 .chip.warn code { background: transparent; padding: 0; }
 .checkpoints { display: flex; flex-direction: column; gap: 6px; }
 .cp-title {
@@ -701,39 +745,51 @@ footer {
 
 JS = """
 (function () {
-  var data = document.getElementById("progress-edges");
-  var timeline = document.querySelector(".timeline");
-  var svg = timeline && timeline.querySelector(".arcs");
+  var data = document.getElementById("progress-links");
+  var box = document.querySelector(".waves");
+  var svg = box && box.querySelector(".links");
   if (!data || !svg) return;
-  var edges = JSON.parse(data.textContent);
-  if (!edges.length) return;
+  var links = JSON.parse(data.textContent);
+  if (!links.length) return;
   var NS = "http://www.w3.org/2000/svg";
   function add(tag, attrs) {
     var el = document.createElementNS(NS, tag);
     for (var k in attrs) el.setAttribute(k, attrs[k]);
     svg.appendChild(el);
   }
+  function spread(key) {
+    var seen = {}, slot = [];
+    links.forEach(function (l) { seen[l[key]] = (seen[l[key]] || 0) + 1; });
+    var used = {};
+    links.forEach(function (l, n) {
+      var k = l[key]; used[k] = (used[k] || 0) + 1;
+      slot[n] = (used[k] - 1 - (seen[k] - 1) / 2) * 12;
+    });
+    return slot;
+  }
+  var out = spread("from"), into = spread("to");
   function draw() {
-    var gutter = parseFloat(getComputedStyle(timeline).getPropertyValue("--gutter"));
-    var stages = timeline.querySelectorAll(".stage");
-    var height = timeline.offsetHeight;
-    svg.setAttribute("width", gutter);
-    svg.setAttribute("height", height);
     while (svg.lastChild) svg.removeChild(svg.lastChild);
-    var x = gutter - 3;
-    edges.forEach(function (e) {
-      var a = stages[e.from], b = stages[e.to];
+    var origin = box.getBoundingClientRect();
+    svg.setAttribute("width", origin.width);
+    svg.setAttribute("height", origin.height);
+    links.forEach(function (l, n) {
+      var a = box.querySelector('[data-i="' + l.from + '"]');
+      var b = box.querySelector('[data-i="' + l.to + '"]');
       if (!a || !b) return;
-      var y1 = a.offsetTop + 15, y2 = b.offsetTop + 15;
-      var span = Math.abs(e.to - e.from);
-      var bend = x - Math.min(gutter - 8, 12 + 9 * (span - 1));
-      var state = e.met ? "met" : "wait";
+      var ra = a.getBoundingClientRect(), rb = b.getBoundingClientRect();
+      var x1 = ra.left + ra.width / 2 + out[n] - origin.left;
+      var y1 = ra.bottom - origin.top;
+      var x2 = rb.left + rb.width / 2 + into[n] - origin.left;
+      var y2 = rb.top - origin.top;
+      if (y2 - y1 < 12) return;
+      var mid = (y1 + y2) / 2, state = l.met ? "met" : "wait";
       add("path", {
-        "class": "arc " + state,
-        d: "M" + x + " " + y1 + " C" + bend + " " + y1 + " " + bend + " " +
-           y2 + " " + x + " " + y2
+        "class": "link " + state,
+        d: "M" + x1 + " " + y1 + " C" + x1 + " " + mid + " " + x2 + " " +
+           mid + " " + x2 + " " + (y2 - 3)
       });
-      add("circle", {"class": "arc-end " + state, cx: x, cy: y2, r: 2.6});
+      add("circle", {"class": "link-end " + state, cx: x2, cy: y2 - 3, r: 2.6});
     });
   }
   draw();

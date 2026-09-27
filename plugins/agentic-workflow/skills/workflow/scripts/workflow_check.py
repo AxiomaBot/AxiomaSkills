@@ -20,7 +20,10 @@ What is checked, in order:
   carries a valid status; a row at ``planned`` or later links a folder that
   exists, no two rows link the same folder, and every folder has a row whose
   status agrees with the file. A signed-off feature moves to ``## Done``, and
-  a folder linked from there counts as ``done``;
+  a folder linked from there counts as ``done``. The optional ``After``
+  column of ``## Features`` lists, comma-separated, the features a row cannot
+  start before: every entry names a row in ``## Features`` or ``## Done``,
+  and the entries form no cycle;
 * every ``docs/features/<slug>/feature.md`` -- frontmatter ``status`` (one a
   feature folder can hold: ``planned`` and later), ``depends-on``,
   ``dark-ship``, ``checkpoint``; a ``## Chunks`` section with
@@ -114,6 +117,8 @@ Silently yielding none would disable every folder-to-row check below."""
 ROW_LINK = re.compile(r"^\[([^\]]+)\]\(([^)]+)\)$")
 DEPENDS_ENTRY = re.compile(r"^([A-Za-z0-9][\w.-]*)/(\S+)")
 BACKTICKED = re.compile(r"`([^`]+)`")
+AFTER_NONE = frozenset({"", "-", "—", "–"})
+"""An ``After`` cell reading as "waits on nothing"."""
 BUILD_MODEL = re.compile(r"^Build model:\s*\S", re.M)
 """The closing line ``/plan`` writes and ``/build`` refuses to start without."""
 
@@ -462,6 +467,88 @@ def done_links(text: str) -> list[str]:
     ]
 
 
+def table(text: str) -> list[dict[str, str]]:
+    """Body rows of the first Markdown table in ``text``, keyed by lower-cased
+    header cell, so a column is found by its name rather than its position."""
+    lines: list[list[str]] = []
+    for line in text.splitlines():
+        stripped = line.strip()
+        if not stripped.startswith("|"):
+            if lines:
+                break
+            continue
+        lines.append([cell.strip() for cell in stripped.strip("|").split("|")])
+    if not lines:
+        return []
+    header = [cell.lower() for cell in lines[0]]
+    return [
+        dict(zip(header, row))
+        for row in lines[1:]
+        if not all(set(cell) <= set("-: ") for cell in row)
+    ]
+
+
+def row_slug(cell: str) -> str:
+    """The slug a table row names: its folder when linked, else its name."""
+    link = ROW_LINK.match(cell)
+    return slug_of(link.group(2)) if link else cell.strip("`")
+
+
+def after_entries(cell: str) -> list[str]:
+    """The features an ``After`` cell names, comma-separated; a dash is none."""
+    entries = (entry.strip().strip("`").strip() for entry in cell.split(","))
+    return [entry for entry in entries if entry not in AFTER_NONE]
+
+
+def _cycle(graph: dict[str, list[str]]) -> list[str] | None:
+    """One cycle in ``graph`` as ``[a, b, ..., a]``, or None."""
+    state: dict[str, int] = {}
+    path: list[str] = []
+
+    def visit(node: str) -> list[str] | None:
+        state[node] = 1
+        path.append(node)
+        for nxt in graph.get(node, []):
+            if state.get(nxt) == 1:
+                return path[path.index(nxt) :] + [nxt]
+            if nxt not in state and (found := visit(nxt)):
+                return found
+        path.pop()
+        state[node] = 2
+        return None
+
+    for node in graph:
+        if node not in state and (found := visit(node)):
+            return found
+    return None
+
+
+def check_after(text: str, report: Report) -> None:
+    """Every ``After`` entry names a roadmap row, and together they form no
+    cycle. A table without the column declares nothing, so passes as is."""
+    parts = sections(text, 2)
+    rows = table(parts.get("features", ""))
+    known = {
+        row_slug(next(iter(row.values()), ""))
+        for part in ("features", "done")
+        for row in table(parts.get(part, ""))
+    }
+    graph: dict[str, list[str]] = {}
+    for row in rows:
+        slug = row_slug(next(iter(row.values()), ""))
+        entries = after_entries(row.get("after", ""))
+        for entry in entries:
+            if entry not in known:
+                report.fail(
+                    "roadmap.md", f"`{slug}` is after `{entry}`, which has no row"
+                )
+        graph[slug] = [entry for entry in entries if entry in known]
+    cycle = _cycle(graph)
+    if cycle:
+        loop = " → ".join(f"`{slug}`" for slug in cycle)
+        report.fail("roadmap.md", f"`After` entries form a cycle: {loop}")
+
+
 def check_roadmap(root: Path, report: Report) -> dict[str, str]:
     """Check ``roadmap.md`` and return ``{folder slug: status}`` for linked rows."""
     path = root / "roadmap.md"
@@ -473,6 +560,7 @@ def check_roadmap(root: Path, report: Report) -> dict[str, str]:
     for title in ROADMAP_SECTIONS:
         if not has_section(text, 2, title):
             report.fail("roadmap.md", f"missing section `## {title}`")
+    check_after(text, report)
     statuses: dict[str, str] = {}
     for name, link, status in roadmap_rows(text):
         if status not in STATUSES:

@@ -369,7 +369,7 @@ switches your session down.
 | `fix-review` | fix-review | Address both PR reviews — self-fetches the quality report and the security verdict for the current head — fix every blocking issue with a sibling sweep, and file or escalate every security-relevant finding even on an otherwise-clean head. Disagrees only with file-and-line evidence | code, tests, `docs/deferred.md` |
 | `auto-chunk <feature> <chunk>` | coding (spawns the rest) | Run one chunk end to end unattended — plan → build → handoff → PR → review loop → squash-merge. You only initialize and manual-test | everything above |
 | `retro <feature>` | planning | Feature close — measure how a completed feature actually went, default to "no change", propose at most three workflow edits, each naming what it replaces. **The only writer of `docs/weak-spots.md`** | `docs/retros/<slug>.md`, `docs/weak-spots.md` |
-| `progress [<target>]` | coding | Render the roadmap as one HTML page on demand: shipped and in-flight features, each feature's manual-checkpoint progress, the `depends-on` graph, and status disagreements between `roadmap.md` and `feature.md`. Ends at `<target>` when given. The drawing is `skills/progress/scripts/progress.py`; the model writes only the headline, summary and up to three notes | Nothing in the project: one HTML file in a temp path, published as an artifact when the session can |
+| `progress [<target>]` | coding | Render the roadmap as one HTML page on demand: shipped features, then the rest in waves of what can be built in parallel (from `After` and `depends-on`), each feature's manual-checkpoint progress, and status disagreements between `roadmap.md` and `feature.md`. Ends at `<target>` when given. The drawing is `skills/progress/scripts/progress.py`; the model writes only the headline, summary and up to three notes | Nothing in the project: one HTML file in a temp path, published as an artifact when the session can |
 
 Harness skills the workflow leans on but does not ship: a code-review skill
 for the pre-PR self-review, and your project's own end-to-end verify skill if
@@ -409,7 +409,7 @@ exists to prevent.
 
 | File | What it is | Who writes it | When you read it |
 |------|-----------|---------------|------------------|
-| `roadmap.md` | Direction, the feature index with statuses, outlined features, the backlog | You + `roadmap`; `handoff` (a feature's row); you (marking `done`) | When deciding what's next |
+| `roadmap.md` | Direction, the feature index with statuses and what each waits on (`After`), outlined features, the backlog | You + `roadmap`; `handoff` (a feature's row); you (marking `done`) | When deciding what's next |
 | `docs/features/<slug>/feature.md` | One feature: goal, milestone, settled decisions, chunks with spec blocks, `depends-on`, `dark-ship`, checkpoint | `roadmap detail`; `handoff` (boxes + status); you (`done`, sign-off) | When starting or reviewing a feature |
 | `docs/features/<slug>/chunks/<n>-<slug>.md` | One chunk's build contract: invariants, decisions or assumptions, tasks, manual test steps, `Build model:` | `plan` | Skim the assumptions after an `--auto` plan |
 | `docs/features/<slug>/manual_tests.md` | That feature's checkpoint checklist | `handoff` | At the checkpoint — your main job |
@@ -453,7 +453,7 @@ your project is ever regenerated from here.
 
 | Template | Where it lands | Notes |
 |----------|----------------|-------|
-| `templates/roadmap.md` | `roadmap.md` | Direction, Features, Done, Backlog — the four sections `check` requires |
+| `templates/roadmap.md` | `roadmap.md` | Direction, Features, Done, Backlog — the four sections `check` requires. The Features table's `After` column names the features a row cannot start before; `check` rejects an entry with no row and a cycle, and `progress` lays features out in parallel waves from it |
 | `templates/weak-spots.md` | `docs/weak-spots.md` | Header, the expiry rule, the tag vocabulary, an empty five-column table. On a migration, seeded one line per recurring-blocker category from your old build prompt, anecdotes dropped |
 | `templates/feature.md` | `docs/features/<slug>/feature.md` | Written by `roadmap detail` per feature, not by `init` itself |
 | `templates/chunk.md` | `docs/features/<slug>/chunks/<n>-<slug>.md` | Written by `plan` per chunk |
@@ -585,8 +585,8 @@ Who picks, and where it is recorded:
 - **Something looks off in the layout or the docs:**
   `/agentic-workflow:workflow check`.
 - **See where the project stands:** `/agentic-workflow:progress <target>` —
-  one HTML page with what shipped, what is in flight, checkpoint progress
-  and the dependency graph, ending at `<target>` (e.g. the go-live
+  one HTML page with what shipped, what can be built now and in parallel,
+  checkpoint progress and what waits on what, ending at `<target>` (e.g. the go-live
   feature). Read-only; the page goes to a temp path or an artifact.
 - **Checkpoint reached:** run `docs/features/<slug>/manual_tests.md` top to
   bottom, and report failures by item title or chunk tag.

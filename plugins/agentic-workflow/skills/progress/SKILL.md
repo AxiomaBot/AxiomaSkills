@@ -1,5 +1,5 @@
 ---
-description: Render the roadmap as one HTML page on demand — what shipped, what is in flight, each feature's manual-checkpoint progress, and the depends-on graph — then publish it or hand over the file. Read-only.
+description: Render the roadmap as one HTML page on demand — what shipped, what can be built now and in parallel, each feature's manual-checkpoint progress, and what waits on what — then publish it or hand over the file. Read-only.
 argument-hint: "[<target-feature>]"
 ---
 
@@ -25,17 +25,24 @@ so.
 reading and drawing. Its docstring is the contract, so don't re-derive a rule
 from the files by hand.
 
-- Every row of `roadmap.md` → `## Done` and then `## Features`, in table
-  order, with its status and one-line description.
+- **Shipped**: the `## Done` rows, in table order.
+- **Ahead**: the `## Features` rows, in **waves**. Wave 1 is everything that
+  can start now, and features in the same wave can be built in parallel.
+  What a feature waits on is its row's `After` cell plus its `feature.md`
+  `depends-on`. Lines join features within Ahead, solid when met and dashed
+  while waiting. What a feature waits on from Shipped shows as a chip only.
 - **Manual checkpoint progress**: ticked out of total top-level items per
   `##` checkpoint in each feature's `manual_tests.md`, and the sign-off line.
-- **The dependency graph**: an arc from each feature to what its
-  `depends-on` names, solid when met and dashed while waiting. Only features
-  with a folder carry `depends-on`, so an `outlined` feature has no arcs.
-  That is the roadmap's actual state, not a gap in the page.
 - A **status disagreement** between a `roadmap.md` row and its `feature.md`
   shows as a chip on that feature. The page reports the disagreement but
   can't say which file is right.
+
+If `roadmap.md` has no `After` column, the roadmap hasn't declared any order
+between outlined features. Ahead then falls back to table order, one feature
+per row, and the page says so. Tell the user that adding the column (see
+`${CLAUDE_PLUGIN_ROOT}/templates/roadmap.md`) is what shows the parallel
+work. Don't add it yourself: this skill writes nothing, and what waits on
+what is a planning call.
 
 The page does not show chunk-level build progress, dates or forecasts, and it
 has nothing that isn't in those files.

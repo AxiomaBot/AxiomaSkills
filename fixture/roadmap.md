@@ -10,11 +10,11 @@ features, and one dark-ship gate that is real code rather than a UI hint.
 
 ## Features
 
-| Feature | Status | One line |
-|---------|--------|----------|
-| [demo-widget](docs/features/demo-widget/feature.md) | building | List widgets behind the demo gate |
-| demo-export | outlined | Export a widget list as CSV |
-| demo-search | idea | Search widgets by name |
+| Feature | Status | One line | After |
+|---------|--------|----------|-------|
+| [demo-widget](docs/features/demo-widget/feature.md) | building | List widgets behind the demo gate | demo-foundation |
+| demo-export | outlined | Export a widget list as CSV | demo-widget |
+| demo-search | idea | Search widgets by name | demo-foundation |
 
 ## Done
 

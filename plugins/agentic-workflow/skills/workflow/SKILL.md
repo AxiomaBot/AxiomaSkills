@@ -53,7 +53,8 @@ judgment. Stop if there is no one to ask. Two starting points, one result:
 - **Fresh project** — nothing exists yet. Interview for the project name, the
   direction paragraph, and the features (one line each, with their status:
   `idea`, `outlined`, or — for the one about to start — `outlined` now and
-  the `roadmap` skill's `detail` mode next).
+  the `roadmap` skill's `detail` mode next; and the features each cannot
+  start before, for its `After` cell).
 - **Migration** — a plan exists in another shape (one plan file, one test
   checklist, one deferred log). Read it all first. Then: closed phases become
   one row each under `## Done`; the phase in flight becomes a feature folder

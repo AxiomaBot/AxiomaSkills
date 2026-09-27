@@ -438,6 +438,36 @@ def test_features_table_with_a_fourth_column_still_parses(project: Path):
     assert _findings(project) == []
 
 
+def _with_after(alpha: str, beta: str) -> str:
+    return (
+        ROADMAP.replace(
+            "| Feature | Status | One line |\n|---------|--------|----------|",
+            "| Feature | Status | One line | After |\n|---|---|---|---|",
+        )
+        .replace("| building | First |", f"| building | First | {alpha} |")
+        .replace("| outlined | Second |", f"| outlined | Second | {beta} |")
+    )
+
+
+def test_after_entries_naming_rows_pass(project: Path):
+    _write(project, "roadmap.md", _with_after("—", "alpha"))
+    assert _findings(project) == []
+
+
+def test_an_after_entry_must_name_a_row(project: Path):
+    _write(project, "roadmap.md", _with_after("", "alpha, gamma"))
+    assert _findings(project) == [
+        "roadmap.md: `beta` is after `gamma`, which has no row"
+    ]
+
+
+def test_after_entries_must_not_form_a_cycle(project: Path):
+    _write(project, "roadmap.md", _with_after("beta", "`alpha`"))
+    assert _findings(project) == [
+        "roadmap.md: `After` entries form a cycle: `alpha` → `beta` → `alpha`"
+    ]
+
+
 def test_a_status_cell_carrying_more_than_one_word_is_read_whole(project: Path):
     """`building (paused)` is an unknown status, not an unparseable row."""
     _write(

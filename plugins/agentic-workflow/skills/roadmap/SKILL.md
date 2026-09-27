@@ -68,7 +68,10 @@ where its expiry is scheduled.
    impossible, not merely unlikely.
 2. **Decompose into features as vertical slices.** Each ends with something
    the user can observe and exercise by hand. Order by risk and dependency:
-   the riskiest assumption is tested by the earliest feature that can.
+   the riskiest assumption is tested by the earliest feature that can. Fill
+   each row's `After` cell with the features it cannot start before,
+   comma-separated; empty means it can start now. That is what shows which
+   features can be built in parallel long before any of them has a folder.
 3. **Apply the horizon**, run the pre-mortem, write `roadmap.md` from
    `${CLAUDE_PLUGIN_ROOT}/templates/roadmap.md` and `detail` the first
    feature.
@@ -85,7 +88,9 @@ The rolling-wave step — run when a feature is about to start, not before.
    answers in, asking about anything that is a product call.
 3. **Declare the dependencies and the gate.** `depends-on` lists the chunks
    of other features this one needs, as `<feature>/<n>`; the `plan` skill
-   refuses to start until each is on `main`. Two features merge into one
+   refuses to start until each is on `main`. Start from the row's `After`
+   cell: each feature named there becomes the specific chunks this one needs
+   from it, and a feature it turns out not to need comes off the cell. Two features merge into one
    only when B cannot be manually tested without all of A *and* A has no
    user-visible value without B. `dark-ship` names the **server-side**
    enforcement point that keeps the feature invisible until sign-off — a
@@ -116,7 +121,7 @@ The rolling-wave step — run when a feature is about to start, not before.
 3. Run the consequence checks and state each result: does it **orphan an
    interim invariant** (reschedule the replacement explicitly)? **Invalidate
    an unrun checkpoint** (name the affected items)? **Break a `depends-on`**
-   of any planned chunk?
+   of any planned chunk, or an `After` cell of any outlined feature?
 4. Append one dated line — what changed and why — to
    `docs/roadmap_changelog.md`, so a refinement is never silently absorbed.
 5. Apply the agreed diff.
@@ -125,8 +130,8 @@ The rolling-wave step — run when a feature is about to start, not before.
 
 - Does every feature end with an **observable milestone**?
 - Does every chunk state its **invariants**, including what must be refused?
-- Are dependencies explicit `depends-on` entries and `Depends-on /
-  must-not-break` lines, never prose the reader must infer?
+- Are dependencies explicit `After` cells, `depends-on` entries and
+  `Depends-on / must-not-break` lines, never prose the reader must infer?
 - Is any **product decision disguised as an auto-pick**? Would the user care
   which way it goes? Then ask now.
 - Which later feature could invalidate this design? Resequence, or record the
