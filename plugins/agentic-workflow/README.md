@@ -2,7 +2,7 @@
 
 A Claude Code plugin that installs one opinionated way of building software
 with agents: **you supply product judgment and manual testing; agents do the
-planning, coding, reviewing and bookkeeping**, through nine skills that hand
+planning, coding, reviewing and bookkeeping**, through ten skills that hand
 work to each other through files in your repository.
 
 This README is the **operator's manual**. It describes what *you* do at each
@@ -39,6 +39,7 @@ readability. When *you* type it, type the namespaced form:
 | `/fix-review` | `/agentic-workflow:fix-review` |
 | `/auto-chunk <feature> <chunk>` | `/agentic-workflow:auto-chunk <feature> <chunk>` |
 | `/retro <feature>` | `/agentic-workflow:retro <feature>` |
+| `/progress [<target>]` | `/agentic-workflow:progress [<target-feature>]` |
 
 Two things that are *not* namespaced and are worth keeping apart:
 
@@ -114,8 +115,8 @@ Three properties hold the whole thing together:
 ### Requirements
 
 - Claude Code with plugin support.
-- Python 3.10+ on `PATH` for the bundled scripts — the two the skills run
-  (`workflow_check.py`, `review_context.py`) and the CI guard
+- Python 3.10+ on `PATH` for the bundled scripts — the three the skills run
+  (`workflow_check.py`, `review_context.py`, `progress.py`) and the CI guard
   `check_committed_permission_grants.py`. Standard library only, nothing to
   install. A project with a managed environment prefixes the skills' scripts
   the way its own `CLAUDE.md` → Commands does (`poetry run`, `uv run`, …);
@@ -351,7 +352,7 @@ You toggle auto-accept yourself before `build`.
 
 ---
 
-## The nine skills
+## The ten skills
 
 Tiers are floors, not pins: a skill runs on your session's model as long as it
 is at or above its tier's floor, stops rather than run below it, and never
@@ -368,6 +369,7 @@ switches your session down.
 | `fix-review` | fix-review | Address both PR reviews — self-fetches the quality report and the security verdict for the current head — fix every blocking issue with a sibling sweep, and file or escalate every security-relevant finding even on an otherwise-clean head. Disagrees only with file-and-line evidence | code, tests, `docs/deferred.md` |
 | `auto-chunk <feature> <chunk>` | coding (spawns the rest) | Run one chunk end to end unattended — plan → build → handoff → PR → review loop → squash-merge. You only initialize and manual-test | everything above |
 | `retro <feature>` | planning | Feature close — measure how a completed feature actually went, default to "no change", propose at most three workflow edits, each naming what it replaces. **The only writer of `docs/weak-spots.md`** | `docs/retros/<slug>.md`, `docs/weak-spots.md` |
+| `progress [<target>]` | coding | Render the roadmap as one HTML page on demand: shipped and in-flight features, each feature's manual-checkpoint progress, the `depends-on` graph, and status disagreements between `roadmap.md` and `feature.md`. Ends at `<target>` when given. The drawing is `skills/progress/scripts/progress.py`; the model writes only the headline, summary and up to three notes | Nothing in the project: one HTML file in a temp path, published as an artifact when the session can |
 
 Harness skills the workflow leans on but does not ship: a code-review skill
 for the pre-PR self-review, and your project's own end-to-end verify skill if
@@ -582,6 +584,10 @@ Who picks, and where it is recorded:
   case is the whole drain: skip it and the finding lives only in the PR thread.
 - **Something looks off in the layout or the docs:**
   `/agentic-workflow:workflow check`.
+- **See where the project stands:** `/agentic-workflow:progress <target>` —
+  one HTML page with what shipped, what is in flight, checkpoint progress
+  and the dependency graph, ending at `<target>` (e.g. the go-live
+  feature). Read-only; the page goes to a temp path or an artifact.
 - **Checkpoint reached:** run `docs/features/<slug>/manual_tests.md` top to
   bottom, and report failures by item title or chunk tag.
 - **You spot a bug mid-anything:** don't chase it — ask for it to be appended
@@ -596,7 +602,7 @@ contract rather than to prose:
 
 1. Make the edit.
 2. Run the tests **from the repo root**, not from here: `pytest` (needs only
-   pytest — both bundled scripts are stdlib-only). They cover the two scripts
+   pytest — the bundled scripts are stdlib-only). They cover the three scripts
    the skills execute, and one of them runs the layout check against
    `fixture/`, so a break in either the checker or the fixture fails here. A
    third pins the guard script the repo runs from `scripts/` byte-for-byte
