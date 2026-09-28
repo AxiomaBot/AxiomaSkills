@@ -151,6 +151,38 @@ nothing on its own — the install is always a separate step. A private
 repository works as a marketplace as long as the machine's git credentials can
 clone it.
 
+### Cloud sessions (claude.ai/code, the mobile app, Claude Desktop)
+
+**A CLI install does not reach a cloud session.** A session started from the
+web, the phone or the desktop app runs in a fresh container: a new home
+directory, so nothing from your machine's `~/.claude`, and a fresh clone, so
+nothing from an untracked `.claude/settings.local.json`. The only plugin
+configuration it sees is what the repo has **committed**. So each consuming
+repo carries this in `.claude/settings.json`:
+
+```json
+{
+  "extraKnownMarketplaces": {
+    "axioma-skills": {
+      "source": { "source": "github", "repo": "AxiomaBot/AxiomaSkills" }
+    }
+  },
+  "enabledPlugins": {
+    "agentic-workflow@axioma-skills": true,
+    "writer@axioma-skills": true
+  }
+}
+```
+
+The marketplace key must be `axioma-skills`, the `name` in this repo's
+`marketplace.json`, because that is what the `@axioma-skills` suffix resolves
+against. List only the plugins the project uses. Neither key is a permission
+grant, so the committed-grant guard lets the file through.
+
+The same file also makes a local session in that repo offer the marketplace
+and plugins on first open, so it replaces the per-machine install rather than
+adding to it.
+
 #### There is no commit pin, and why that is acceptable
 
 This plugin used to sit at its repo's root and a consuming project could pin it

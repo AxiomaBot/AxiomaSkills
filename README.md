@@ -40,6 +40,13 @@ is in flight.** The plugin's own README has the
 This repo works as a private marketplace as long as the machine's git
 credentials can clone it.
 
+**Cloud sessions ignore all of the above.** A session started from
+claude.ai/code, the mobile app or Claude Desktop runs in a fresh container, so
+a plugin installed on your machine is not there. The consuming repo has to
+commit `extraKnownMarketplaces` and `enabledPlugins` in its own
+`.claude/settings.json`; the plugin README has
+[the snippet](plugins/agentic-workflow/README.md#cloud-sessions-claudeaicode-the-mobile-app-claude-desktop).
+
 ## Developing a plugin
 
 ```bash
