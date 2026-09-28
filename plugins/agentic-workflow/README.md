@@ -145,20 +145,62 @@ claude plugin marketplace add AxiomaBot/AxiomaSkills
 claude plugin install agentic-workflow@axioma-skills
 ```
 
-Add `--scope user` to make it available in every repo on the machine; the
-default records it against the current project. Adding a marketplace enables
+The install defaults to user scope, which makes it available in every repo
+on the machine; add `--scope project` to record it against the current repo
+instead. Adding a marketplace enables
 nothing on its own — the install is always a separate step. A private
 repository works as a marketplace as long as the machine's git credentials can
 clone it.
 
-### Cloud sessions (claude.ai/code, the mobile app, Claude Desktop)
+### Cloud sessions (claude.ai/code, the mobile app, cloud sessions in Claude Desktop)
 
-**A CLI install does not reach a cloud session.** A session started from the
-web, the phone or the desktop app runs in a fresh container: a new home
-directory, so nothing from your machine's `~/.claude`, and a fresh clone, so
-nothing from an untracked `.claude/settings.local.json`. The only plugin
-configuration it sees is what the repo has **committed**. So each consuming
-repo carries this in `.claude/settings.json`:
+**Neither a CLI install nor the repo's settings reach a cloud session.** A
+cloud session runs in a fresh container: a new home directory, so nothing from
+your machine's `~/.claude`. It also skips the `extraKnownMarketplaces` and
+`enabledPlugins` a repo commits in `.claude/settings.json`, because adding a
+marketplace from repo settings waits for the workspace-trust prompt, and a
+cloud session never shows one. It skips them silently: the only symptom is
+`claude plugin marketplace list` printing `No marketplaces configured`. See
+[plugin loading](https://code.claude.com/docs/en/plugins/loading#plugins-shared-through-a-repository)
+and
+[what carries over to a cloud session](https://code.claude.com/docs/en/cloud-environments#what-carries-over-from-your-setup).
+
+Two routes do work:
+
+1. **The cloud environment's setup script** (any plan). Put the install in the
+   environment's setup script, under the environment menu in the session's
+   title bar, then **Edit**:
+
+   ```bash
+   claude plugin marketplace add AxiomaBot/AxiomaSkills
+   claude plugin install agentic-workflow@axioma-skills
+   claude plugin install writer@axioma-skills
+   ```
+
+   The script runs before Claude Code starts, so the session loads the
+   plugins at startup. It applies to every repo that uses the environment,
+   not to one repo. Its output is cached, and the script re-runs only when you
+   edit it, change the network settings, or the cache expires after about a
+   week. So a new plugin version reaches cloud sessions at the next re-run,
+   not at the next push. The environment's network access has to reach
+   github.com.
+
+   *Tested:* running these three commands inside a cloud container, then
+   starting Claude Code, loaded both plugins, all nine skills and all three
+   agents. *Not tested:* the same commands as an actual setup script.
+
+2. **Organization managed settings** (Team or Enterprise, Owner role). Put
+   the same two keys as the snippet below in
+   [claude.ai/admin-settings/claude-code](https://claude.ai/admin-settings/claude-code).
+   A cloud session fetches those settings before it installs plugins
+   ([docs](https://code.claude.com/docs/en/plugins/org#choose-a-delivery-mechanism)).
+   They apply to every member of the organization, in every repo.
+
+### Local sessions: commit the plugins to the consuming repo
+
+For local sessions (the CLI, or local sessions in Claude Desktop or an IDE), a
+consuming repo can carry the plugins in its own `.claude/settings.json`
+instead of each machine installing them:
 
 ```json
 {
@@ -179,9 +221,9 @@ The marketplace key must be `axioma-skills`, the `name` in this repo's
 against. List only the plugins the project uses. Neither key is a permission
 grant, so the committed-grant guard lets the file through.
 
-The same file also makes a local session in that repo offer the marketplace
-and plugins on first open, so it replaces the per-machine install rather than
-adding to it.
+The marketplace is added after you accept the workspace-trust prompt for that
+folder. Because this marketplace serves its plugins by relative path, they
+then load with no separate install. This file does nothing in a cloud session.
 
 #### There is no commit pin, and why that is acceptable
 

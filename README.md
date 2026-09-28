@@ -19,8 +19,9 @@ claude plugin install agentic-workflow@axioma-skills
 ```
 
 Adding a marketplace enables nothing on its own — the install is always a
-separate step. Add `--scope user` to make a plugin available in every repo on
-the machine; the default records it against the current project instead.
+separate step. The install defaults to user scope, which makes the plugin
+available in every repo on the machine; add `--scope project` to record it
+against the current repo instead.
 
 **There is no commit pin.** A plugin entry's `source` can address a repo root
 but not a subdirectory, so nothing can name `plugins/<name>` at a given commit;
@@ -40,12 +41,16 @@ is in flight.** The plugin's own README has the
 This repo works as a private marketplace as long as the machine's git
 credentials can clone it.
 
-**Cloud sessions ignore all of the above.** A session started from
-claude.ai/code, the mobile app or Claude Desktop runs in a fresh container, so
-a plugin installed on your machine is not there. The consuming repo has to
-commit `extraKnownMarketplaces` and `enabledPlugins` in its own
-`.claude/settings.json`; the plugin README has
-[the snippet](plugins/agentic-workflow/README.md#cloud-sessions-claudeaicode-the-mobile-app-claude-desktop).
+**Cloud sessions ignore all of the above**, and they also ignore plugins a
+repo turns on in its own `.claude/settings.json`. A session started from
+claude.ai/code, the mobile app or a Claude Desktop cloud session runs in a
+fresh container. It adds a marketplace from repo settings only after a
+workspace-trust prompt, which a cloud session never shows, so it skips them
+without an error. What works is installing from the cloud environment's setup
+script, or, on a Team or Enterprise plan, organization managed settings. The
+plugin README has
+[both routes](plugins/agentic-workflow/README.md#cloud-sessions-claudeaicode-the-mobile-app-cloud-sessions-in-claude-desktop)
+and the repo-settings snippet, which still works for local sessions.
 
 ## Developing a plugin
 
