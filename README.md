@@ -45,7 +45,7 @@ claude.ai/code, the mobile app or Claude Desktop runs in a fresh container, so
 a plugin installed on your machine is not there. The consuming repo has to
 commit `extraKnownMarketplaces` and `enabledPlugins` in its own
 `.claude/settings.json`; the plugin README has
-[the snippet and the private-repo caveat](plugins/agentic-workflow/README.md#cloud-sessions-claudeaicode-the-mobile-app-claude-desktop).
+[the snippet](plugins/agentic-workflow/README.md#cloud-sessions-claudeaicode-the-mobile-app-claude-desktop).
 
 ## Developing a plugin
 
