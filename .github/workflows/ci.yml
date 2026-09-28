@@ -1,6 +1,6 @@
 name: CI
 
-# The two bundled scripts are what the `workflow` and `pr-review` skills
+# The bundled scripts are what the `workflow`, `pr-review` and `progress` skills
 # actually execute inside every consuming project, so they are the one part of
 # this repo that can break someone else's build silently. They are stdlib-only,
 # so this needs no lockfile — just pytest and ruff.
@@ -63,7 +63,7 @@ jobs:
           fi
           jq --version
 
-      # Covers both bundled scripts, and — through the layout check running
+      # Covers the bundled scripts, and — through the layout check running
       # against `fixture/` — that the shipped fixture project still satisfies
       # the contract the skills read it against.
       - run: pytest -q

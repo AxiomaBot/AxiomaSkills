@@ -1,4 +1,4 @@
-# This repo ships no Python package — it is a Claude Code plugin. The two
+# This repo ships no Python package — it is a Claude Code plugin. The
 # bundled scripts are stdlib-only and are run by path, not imported. This file
 # exists only to configure the tools that check them.
 
