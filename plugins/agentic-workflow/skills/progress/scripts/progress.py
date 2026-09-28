@@ -25,9 +25,11 @@ every task box under that chunk's heading is ticked or its feature is
 The page has two parts. **Shipped** lists the ``## Done`` rows in table order.
 **Ahead** lays the other rows out in waves: wave 1 is every feature with
 nothing unmet to wait on, and each later wave waits on something in an
-earlier one, so features in the same wave can be built in parallel. Lines
-join a feature to the features it waits on within Ahead; what it waits on
-from Shipped is met by definition and shown only as a chip. A roadmap with no
+earlier one, so features in the same wave can be built in parallel. A line
+joins a feature to what waits on it in the very next wave; every other
+dependency is a chip only, because a line that skipped a wave would pass
+behind the cards between and read as an edge it is not. What a feature waits
+on from Shipped is met by definition and shown only as a chip. A roadmap with no
 ``After`` column has declared no order between outlined features, so Ahead
 falls back to table order, one feature per row, and says so. A cycle cannot
 hang the layout: a feature met again while its own wave is being worked out
@@ -43,7 +45,7 @@ printed from the repository or the arguments is HTML-escaped.
 Exit status is 0 when the page was written and 2 on a usage error: no
 ``roadmap.md``, or a ``--target`` or ``--note`` naming a feature the page does
 not show. ``--target`` ends the page at that row of ``## Features``; rows
-after it in the table are left off.
+after it in the table are left off, and the page says how many.
 
 Usage::
 
@@ -143,6 +145,8 @@ class Page:
     ordered: bool = False
     """True when ``## Features`` has an ``After`` column to lay waves out by."""
     target: str | None = None
+    hidden: int = 0
+    """How many ``## Features`` rows after ``target`` the page leaves off."""
 
 
 def _cell(row: dict[str, str], key: str, position: int) -> str:
@@ -317,6 +321,7 @@ def build(
             raise UsageError(f"--target `{target}` is not a row in `## Features`")
         page.features = features[: slugs.index(target) + 1]
         page.target = target
+        page.hidden = len(features) - len(page.features)
         for feature in page.features:
             for dep in feature.depends:
                 if dep.upstream is not None and dep.upstream >= len(page.features):
@@ -367,12 +372,13 @@ def inline(text: str) -> str:
 
 
 def _pill(feature: Feature, is_target: bool) -> str:
-    if is_target:
-        return '<span class="pill target">Target</span>'
     kind = feature.kind
     css = "done" if kind == "done" else "flight" if kind in IN_FLIGHT else "later"
     label = "Done" if kind == "done" else feature.status or kind
-    return f'<span class="pill {css}">{html.escape(label)}</span>'
+    pill = f'<span class="pill {css}">{html.escape(label)}</span>'
+    if is_target:
+        pill += '<span class="pill target">Target</span>'
+    return pill
 
 
 def _checkpoint_html(feature: Feature) -> str:
@@ -451,7 +457,7 @@ def _card(feature: Feature, position: int, focus: bool, target: bool) -> str:
         f'<article class="{" ".join(classes)}" data-i="{position}">'
         '<div class="card-top">'
         f'<span class="name">{html.escape(feature.name)}</span>'
-        f"{_pill(feature, target)}</div>"
+        f'<span class="pills">{_pill(feature, target)}</span></div>'
         f"{line}{mismatch}{after}{_checkpoint_html(feature)}{note}{shipped}"
         "</article>"
     )
@@ -460,7 +466,7 @@ def _card(feature: Feature, position: int, focus: bool, target: bool) -> str:
 def _wave_label(number: int, size: int, ordered: bool) -> str:
     if not ordered:
         return ""
-    lead = "Can start now" if number == 1 else f"Wave {number}"
+    lead = "Now" if number == 1 else f"Wave {number}"
     tail = f" &middot; {size} in parallel" if size > 1 else ""
     return f'<p class="wave-label">{lead}{tail}</p>'
 
@@ -481,13 +487,18 @@ def render(
     grouped = waves(page)
     focus = set(flight or (grouped[0] if grouped else []))
 
-    ahead = {i for wave in grouped for i in wave}
+    wave_of = {i: number for number, wave in enumerate(grouped) for i in wave}
     links = [
         {"from": dep.upstream, "to": i, "met": dep.met}
-        for i in sorted(ahead)
+        for i in sorted(wave_of)
         for dep in features[i].depends
-        if dep.upstream in ahead and dep.upstream != i
+        if dep.upstream in wave_of and wave_of[i] - wave_of[dep.upstream] == 1
     ]
+    distance = ""
+    if page.ordered and grouped:
+        unit = "wave" if len(grouped) == 1 else "waves"
+        end = f"to {html.escape(features[-1].name)}" if page.target else "ahead"
+        distance = f" &middot; {len(grouped)} {unit} {end}"
 
     segments = "".join(
         '<span class="seg '
@@ -512,14 +523,23 @@ def render(
             "can be built in parallel.</p>"
         )
         legend = (
-            '<p class="hint"><svg width="46" height="10" aria-hidden="true">'
+            '<p class="hint legend"><svg width="46" height="10" aria-hidden="true">'
             '<path class="link met" d="M2 5 H20"/>'
             '<path class="link wait" d="M26 5 H44"/></svg>'
-            "Lines run from a feature to the ones waiting on it: solid when met, "
-            "dashed while waiting.</p>"
+            "Lines run from a feature to what waits on it in the next wave: "
+            "solid when met, dashed while waiting. Farther edges are chips "
+            "only.</p>"
             if links
             else ""
         )
+        left_off = ""
+        if page.hidden:
+            noun = "feature" if page.hidden == 1 else "features"
+            left_off = (
+                f'<p class="hint">{page.hidden} {noun} after '
+                f"{html.escape(features[-1].name)} in roadmap.md "
+                "not shown.</p>"
+            )
         rows = "".join(
             '<div class="wave">'
             + _wave_label(number, len(wave), page.ordered)
@@ -534,7 +554,7 @@ def render(
         ahead_html = (
             f'<section class="part"><h2>Ahead</h2>{fallback}{legend}'
             f'<div class="waves"><svg class="links" aria-hidden="true"></svg>'
-            f"{rows}</div></section>"
+            f"{rows}</div>{left_off}</section>"
         )
 
     title = f"{page.project} Roadmap"
@@ -549,7 +569,7 @@ def render(
         '<section class="progress" aria-label="Overall progress">'
         '<div class="progress-head"><span class="label">Features</span>'
         f'<span class="count"><b>{len(done)}</b> of {total} done'
-        f" &middot; {len(flight)} in flight</span></div>"
+        f" &middot; {len(flight)} in flight{distance}</span></div>"
         f'<div class="segments" style="--n:{max(total, 1)}">{segments}</div>'
         f"</section>{shipped_html}{ahead_html}"
         "<footer><span>From roadmap.md and docs/features/</span>"
@@ -658,6 +678,8 @@ h2 {
   display: flex; align-items: center; gap: 8px; margin: -4px 0 14px;
   font-size: 12px; color: var(--text-muted);
 }
+.hint svg { flex: none; }
+.waves + .hint { margin: 14px 0 0; }
 .waves { position: relative; display: flex; flex-direction: column; gap: 40px; }
 .links {
   position: absolute; left: 0; top: 0; overflow: visible; pointer-events: none;
@@ -667,6 +689,11 @@ h2 {
 .link.wait { stroke: var(--accent); stroke-dasharray: 4 3; }
 .link-end.met { fill: var(--success); }
 .link-end.wait { fill: var(--accent); }
+@media (max-width: 600px) {
+  /* Cards stack in one column here, so a line would run behind the cards
+     of its own wave; the After chips carry every edge on their own. */
+  .links, .legend { display: none; }
+}
 .wave { position: relative; }
 .wave-label {
   position: relative; display: inline-block; margin: 0 0 8px;
@@ -691,6 +718,7 @@ h2 {
   flex-wrap: wrap; gap: 8px;
 }
 .name { font-weight: 600; font-size: 15px; overflow-wrap: anywhere; }
+.pills { display: flex; gap: 6px; flex-wrap: wrap; }
 .k-done .name::before { content: "\\2713  "; color: var(--success); }
 .line { margin: 0; color: var(--text-muted); font-size: 13.5px; }
 .pill {
@@ -733,8 +761,9 @@ h2 {
 .cp-bar i { display: block; height: 100%; background: var(--success); }
 .cp-count { font-size: 11.5px; text-align: right; font-variant-numeric: tabular-nums; }
 .note {
-  margin: 0; padding: 10px 12px; border-radius: 8px;
-  background: var(--accent-soft); font-size: 13px;
+  margin: 0; padding: 8px 12px; border-radius: 0 6px 6px 0;
+  background: var(--surface-muted); border-left: 3px solid var(--accent);
+  font-size: 13px;
 }
 footer {
   margin-top: 40px; padding-top: 14px; border-top: 1px solid var(--border);

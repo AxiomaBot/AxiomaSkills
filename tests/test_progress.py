@@ -119,7 +119,8 @@ def test_the_fixture_renders_shipped_then_waves(tmp_path: Path):
     assert "<b>1</b> of 4 done" in page_html
     assert "demo-shop (fixture)" in page_html
     assert page_html.index("<h2>Shipped</h2>") < page_html.index("<h2>Ahead</h2>")
-    assert "Can start now &middot; 2 in parallel" in page_html
+    assert "Now &middot; 2 in parallel" in page_html
+    assert "1 in flight &middot; 2 waves ahead" in page_html
 
 
 def test_the_fixture_waves_follow_its_after_column():
@@ -182,7 +183,26 @@ def test_no_after_column_falls_back_to_table_order(tmp_path: Path):
     assert _wave_slugs(page) == [["a"], ["b"]]
     page_html = pg.render(page)
     assert "has no <code>After</code> column" in page_html
-    assert "Can start now" not in page_html
+    assert '<p class="wave-label">' not in page_html
+    assert "waves ahead" not in page_html
+
+
+def test_only_edges_between_adjacent_waves_are_drawn(tmp_path: Path):
+    # a -> c skips wave 2, so it is a chip only; a line would pass behind b.
+    rows = (
+        _row("a", "outlined", "", linked=False)
+        + _row("b", "outlined", "a", linked=False)
+        + _row("c", "outlined", "a, b", linked=False)
+    )
+    page = pg.build(_project(tmp_path, rows))
+    assert _wave_slugs(page) == [["a"], ["b"], ["c"]]
+    page_html = pg.render(page)
+    assert _links(page_html) == [
+        {"from": 0, "to": 1, "met": False},
+        {"from": 1, "to": 2, "met": False},
+    ]
+    assert "a &middot; waiting" in page_html
+    assert "3 waves ahead" in page_html
 
 
 def test_a_cycle_does_not_hang_the_layout(tmp_path: Path):
@@ -281,7 +301,12 @@ def test_target_ends_the_page_and_hides_what_comes_after_it(tmp_path: Path):
     page_html = pg.render(page)
     assert _links(page_html) == [{"from": 0, "to": 1, "met": False}]
     assert "c &middot; not shown" in page_html
-    assert '<span class="pill target">Target</span>' in page_html
+    assert "1 feature after b in roadmap.md not shown" in page_html
+    assert "2 waves to b" in page_html
+    assert (
+        '<span class="pill later">outlined</span>'
+        '<span class="pill target">Target</span>'
+    ) in page_html
 
 
 @pytest.mark.parametrize(

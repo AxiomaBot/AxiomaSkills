@@ -29,8 +29,10 @@ from the files by hand.
 - **Ahead**: the `## Features` rows, in **waves**. Wave 1 is everything that
   can start now, and features in the same wave can be built in parallel.
   What a feature waits on is its row's `After` cell plus its `feature.md`
-  `depends-on`. Lines join features within Ahead, solid when met and dashed
-  while waiting. What a feature waits on from Shipped shows as a chip only.
+  `depends-on`. A line joins a feature to what waits on it in the next wave,
+  solid when met and dashed while waiting; every other edge, including what
+  a feature waits on from Shipped, shows as a chip only. The header counts
+  the waves ahead (or to the target): the sequential steps left.
 - **Manual checkpoint progress**: ticked out of total top-level items per
   `##` checkpoint in each feature's `manual_tests.md`, and the sign-off line.
 - A **status disagreement** between a `roadmap.md` row and its `feature.md`
