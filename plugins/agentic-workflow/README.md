@@ -624,6 +624,33 @@ Who picks, and where it is recorded:
   bottom, and report failures by item title or chunk tag.
 - **You spot a bug mid-anything:** don't chase it — ask for it to be appended
   to `docs/deferred.md`; `plan` offers it back at the right chunk.
+- **The method itself let something through:** file a
+  [workflow finding](#reporting-a-workflow-finding) on this repo.
+
+---
+
+## Reporting a workflow finding
+
+A retro measures one project and can only *propose* edits; it never touches
+this plugin. Anything you learn about the method itself comes back here as an
+issue, using the
+[Workflow finding](https://github.com/AxiomaBot/AxiomaSkills/issues/new?template=workflow-finding.yml)
+form: one finding per issue, labelled `workflow-finding`. The form asks for
+the same evidence a retro does — project, plugin version, PR and round,
+verbatim wording, the stage that should have caught it, the skill text that
+let it through, and optionally a proposed edit that names what it replaces.
+
+Filing is cheap; changing a skill is not. Triage uses the retro's own bar:
+
+- **Fix it** when the class recurred — across two projects, or two features
+  of one — and link the issues; when it cost multiple rounds; or when it is a
+  `security` class.
+- **Otherwise label it `one-off` and leave it open.** It is variance until it
+  repeats, and an open one-off is what a later finding links to. Close it as
+  *not planned* once a few more projects have gone by without a repeat.
+
+The fix is a normal [skill change](#changing-a-skill) whose PR closes every
+finding it addresses.
 
 ---
 
