@@ -73,9 +73,9 @@ unstated is what the reviewers find, one round at a time.
 - **`--auto`:** no one to ask. Never call `AskUserQuestion`. Resolve every
   fork with the lowest-risk default that fits the codebase and the feature's
   Decisions, and record it. Leave a `[?]` only for a product decision with no
-  safe default — the feature file's *ask-first* items are exactly these — and
-  if any remains the chunk is **not build-ready**: report the markers, don't
-  report it ready.
+  safe default — the feature file's *ask-first* items are exactly these — or
+  for step 8's size marker, and if any remains the chunk is **not
+  build-ready**: report the markers, don't report it ready.
 
 ## Steps
 
@@ -116,6 +116,11 @@ unstated is what the reviewers find, one round at a time.
    for the same chunk.
 8. **Gate check.** No `[?]`; Invariants populated or literally `None — <why>`
    (a chunk with no runtime surface); Manual test steps present; `Build
-   model:` line present. Report: what was decided (attended) or assumed
-   (`--auto`), the invariants, the models, and the next step —
-   `build <feature> <chunk>` on the build model with auto-accept on.
+   model:` line present; the task list still meets the `roadmap` skill's
+   `detail` step-4 size rule. A plan is where a chunk grows, and the roadmap
+   never sees it: a chunk that has outgrown the rule gets the line
+   `[?] size — needs roadmap refine to split` in its chunk file, so `build`
+   and `auto-chunk` refuse it, and you stop there. Otherwise report: what was
+   decided (attended) or assumed (`--auto`), the invariants, the models, and
+   the next step — `build <feature> <chunk>` on the build model with
+   auto-accept on.

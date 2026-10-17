@@ -106,19 +106,35 @@ triage.
 ## Worked example
 
 [#13](https://github.com/AxiomaBot/AxiomaSkills/issues/13) — chunk size is
-stated, never measured. The reference case.
+stated, never measured. The reference case; its triage comment and the PR
+that closed it are the full record.
 
 - **Kind:** finding. **Bar:** fix, on cost (22 `/code-review` rounds, three
   extra scoped review passes, a truncated review context) — not recurrence,
-  since nothing related was filed.
-- **Verified:** every quoted line matched (`roadmap` `detail` step 4 and
-  the pre-mortem, `workflow` Migration, `build`'s "small enough for one
-  complete review", the 300 KB / 400 KB budgets in `review_context.py`). The HousingStyle evidence was taken as stated.
-- **Edits:** roadmap budget — *reword*, the 50 B/line ratio ignores the
-  context lines and whole files the budget also holds; lead with "cut where
-  tasks could each be tested alone". Pre-mortem — *accept*, a replacement.
-  Migration — *accept*, it is the root cause here. Plan size gate — *reword*,
-  "more than one subsystem" fires on most healthy chunks and file length
-  measures recorded decisions, not size; keep the testable-groups test and
-  the re-check on scope growth. Build backstop — *drop*, it fires after the
-  work is done, and `pr-review` step 5 already handles truncation.
+  since nothing related was filed. The cost evidence was in a repo triage
+  could not open, so the verdict says it rests on that evidence as stated.
+- **Verified:** most quoted lines matched. Two claims did not hold as
+  written: the Migration bullet does route through `detail` mode — the gap
+  is its "or write it to its template" shortcut — and the "50 B/line"
+  budget traces to nothing in `review_context.py` and spends the whole cap.
+  Reading the script also showed chunk files are omitted from the review
+  context, which no one had claimed.
+- **Edits:** roadmap budget — *reword*: the rule, with a rough guide, not a
+  derived number, and the cut tied to size (a bare "cut where tasks could
+  each be tested alone" fires on nearly every chunk). Pre-mortem — a
+  replacement, reworded to match. Migration — the first triage called it a
+  replacement (drop the template shortcut); review showed that forces
+  `detail` mode where it does not fit — an `outlined` target, a
+  `roadmap.md` migration has not written yet, a higher tier — so it shipped
+  as the issue proposed it: an addition on both paths. Plan size gate —
+  *reword*: "more than one subsystem" fires on healthy chunks, file length
+  counts a file the reviewer never sees; one item in the existing gate
+  check, which leaves a `[?]` so `build` and `auto-chunk` refuse the chunk —
+  a "not build-ready" report alone stops nothing unattended. Build backstop
+  — *drop*: it fires after the work is done, and `pr-review` step 5 already
+  handles truncation.
+- **Lessons:** a blind re-run (the skill without this section) beat the
+  conversational triage by reading the code behind each claim. And triage
+  is not the last check: a "replacement" that saves a line can break the
+  surrounding skill, and a gate is only real if the next stage's gate reads
+  it. The PR review caught both.

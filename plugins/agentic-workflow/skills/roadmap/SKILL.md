@@ -101,9 +101,15 @@ The rolling-wave step — run when a feature is about to start, not before.
    to confirm here and the reviewers' to judge. A feature that genuinely
    cannot ship dark says `feature branch`; only one such feature is in
    flight at a time, which nothing mechanical enforces.
-4. **Cut chunks**: one coherent slice each, sized so the PR diff gets one
-   complete review (one feature slice, one migration, *or* one script sweep —
-   not all three). State the order and why.
+4. **Cut chunks**: one coherent slice each (one feature slice, one
+   migration, *or* one script sweep — not all three), sized so the PR diff
+   gets one complete review. **The size rule:** the expected diff fits well
+   inside the quality reviewer's context cap (`total_cap` in
+   `${CLAUDE_PLUGIN_ROOT}/skills/pr-review/scripts/review_context.py`) —
+   as a rough guide, about 3,000 added lines of code and tests, plus any
+   generated output the PR commits. A chunk that would crowd it is cut where
+   its tasks fall into groups that could each ship and be verified alone.
+   State the order and why.
 5. **Write each chunk's spec block** (template below). The Invariants line is
    the most valuable line in this workflow: stated here, it is satisfied
    before review; unstated, the review finds it one round at a time.
@@ -136,7 +142,8 @@ The rolling-wave step — run when a feature is about to start, not before.
   which way it goes? Then ask now.
 - Which later feature could invalidate this design? Resequence, or record the
   interim invariant with a locking test and a named expiry.
-- Is any chunk too big for one complete review?
+- Does any chunk break the `detail` step-4 size rule — a diff that would
+  crowd the review cap, with tasks that could be cut into groups?
 - Walk one real user journey through the chunk order: is the app broken for
   a user at any point between checkpoints?
 - **Is every factual claim about existing code true?** Open each cited file

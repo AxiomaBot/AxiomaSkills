@@ -32,7 +32,7 @@ body:
         plugin was loaded with `--plugin-dir`. With no commit pin, this is the
         only way to know which version of a skill produced the run. Say so if
         the run spanned a plugin change.
-      placeholder: "0.5.0"
+      placeholder: "0.6.0"
     validations:
       required: true
 

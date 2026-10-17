@@ -59,7 +59,10 @@ judgment. Stop if there is no one to ask. Two starting points, one result:
   checklist, one deferred log). Read it all first. Then: closed phases become
   one row each under `## Done`; the phase in flight becomes a feature folder
   (the `roadmap` skill's `detail` mode writes the file — run it, or write it
-  to its template with the landed chunks ticked); every superseded file moves
+  to its template with the landed chunks ticked; either way, every stage not
+  yet landed is re-cut to `detail` step 4's size rule, never inherited as
+  is, because the old plan's boundaries were not sized for review); every
+  superseded file moves
   into `docs/archive/` **verbatim** with `git mv`, never edited; the deferred
   log restarts from its open actionable entries only; the recurring-blocker
   list from any build or review prompt seeds `docs/weak-spots.md` one line
