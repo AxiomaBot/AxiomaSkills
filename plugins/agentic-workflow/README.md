@@ -649,12 +649,14 @@ Filing is cheap; changing a skill is not. Triage uses the retro's own bar:
   repeats, and an open one-off is what a later finding links to. Close it as
   *not planned* after 90 days with no linked repeat; reopen it if one turns up.
 - **Decline it** — close as *not planned* with a one-line reason — when it
-  works as intended, the claim does not hold against the skill text, or the
-  cheapest fix costs more text than the problem does.
+  works as intended, it is out of scope, the claim does not hold against the
+  skill text, or the cheapest fix costs more text than the problem does.
 
-A finding that matches an earlier one, open or closed, is a recurrence, not a
-duplicate: link the two and fix. Run the repo's `triage` skill
-(`.claude/skills/triage/`) to apply all of this; it proposes, you decide.
+A finding that matches an earlier one, open or closed, from another project or
+another feature is a recurrence, not a duplicate: link the two and fix. The
+same incident filed twice is a duplicate. Filers need do nothing more;
+maintainers triage with `/triage <issue>` in a clone of this repo, a skill that
+proposes and leaves the decision to them.
 
 The fix is a normal [skill change](#changing-a-skill) whose PR closes every
 finding it addresses.
