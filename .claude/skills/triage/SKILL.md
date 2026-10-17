@@ -106,19 +106,27 @@ triage.
 ## Worked example
 
 [#13](https://github.com/AxiomaBot/AxiomaSkills/issues/13) — chunk size is
-stated, never measured. The reference case.
+stated, never measured. The reference case; its triage comment and the PR
+that closed it are the full record.
 
 - **Kind:** finding. **Bar:** fix, on cost (22 `/code-review` rounds, three
   extra scoped review passes, a truncated review context) — not recurrence,
-  since nothing related was filed.
-- **Verified:** every quoted line matched (`roadmap` `detail` step 4 and
-  the pre-mortem, `workflow` Migration, `build`'s "small enough for one
-  complete review", the 300 KB / 400 KB budgets in `review_context.py`). The HousingStyle evidence was taken as stated.
-- **Edits:** roadmap budget — *reword*, the 50 B/line ratio ignores the
-  context lines and whole files the budget also holds; lead with "cut where
-  tasks could each be tested alone". Pre-mortem — *accept*, a replacement.
-  Migration — *accept*, it is the root cause here. Plan size gate — *reword*,
-  "more than one subsystem" fires on most healthy chunks and file length
-  measures recorded decisions, not size; keep the testable-groups test and
-  the re-check on scope growth. Build backstop — *drop*, it fires after the
-  work is done, and `pr-review` step 5 already handles truncation.
+  since nothing related was filed. The cost evidence was in a repo triage
+  could not open, so the verdict says it rests on that evidence as stated.
+- **Verified:** most quoted lines matched. Two claims did not hold as
+  written: the Migration bullet does route through `detail` mode — the gap
+  is its "or write it to its template" shortcut — and the "50 B/line"
+  budget traces to nothing in `review_context.py` and spends the whole cap.
+  Reading the script also showed chunk files are omitted from the review
+  context, which no one had claimed.
+- **Edits:** roadmap budget — *reword*: the rule, with a rough guide, not a
+  derived number. Pre-mortem — *accept*, a replacement. Migration —
+  *reword* as a replacement: remove the shortcut rather than add a line.
+  Plan size gate — *reword*: "more than one subsystem" fires on healthy
+  chunks, file length counts a file the reviewer never sees, and a re-plan
+  re-runs the gate anyway; one item in the existing gate check. Build
+  backstop — *drop*: it fires after the work is done, and `pr-review` step 5
+  already handles truncation.
+- **Lesson from a blind re-run** (the skill without this section): it beat
+  the first, conversational triage on Migration and the plan gate, because
+  step 2 made it read the code behind each claim rather than the quotes.
