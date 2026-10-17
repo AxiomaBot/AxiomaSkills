@@ -116,6 +116,9 @@ unstated is what the reviewers find, one round at a time.
    for the same chunk.
 8. **Gate check.** No `[?]`; Invariants populated or literally `None — <why>`
    (a chunk with no runtime surface); Manual test steps present; `Build
-   model:` line present. Report: what was decided (attended) or assumed
+   model:` line present; the task list still meets the `roadmap` skill's
+   `detail` step-4 size rule — a plan is where a chunk grows, and the roadmap
+   never sees it, so a chunk that has outgrown the rule is **not
+   build-ready**: say it needs `roadmap refine` to split it, and stop. Report: what was decided (attended) or assumed
    (`--auto`), the invariants, the models, and the next step —
    `build <feature> <chunk>` on the build model with auto-accept on.
