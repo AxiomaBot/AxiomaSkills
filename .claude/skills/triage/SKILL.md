@@ -120,13 +120,21 @@ that closed it are the full record.
   Reading the script also showed chunk files are omitted from the review
   context, which no one had claimed.
 - **Edits:** roadmap budget — *reword*: the rule, with a rough guide, not a
-  derived number. Pre-mortem — *accept*, a replacement. Migration —
-  *reword* as a replacement: remove the shortcut rather than add a line.
-  Plan size gate — *reword*: "more than one subsystem" fires on healthy
-  chunks, file length counts a file the reviewer never sees, and a re-plan
-  re-runs the gate anyway; one item in the existing gate check. Build
-  backstop — *drop*: it fires after the work is done, and `pr-review` step 5
-  already handles truncation.
-- **Lesson from a blind re-run** (the skill without this section): it beat
-  the first, conversational triage on Migration and the plan gate, because
-  step 2 made it read the code behind each claim rather than the quotes.
+  derived number, and the cut tied to size (a bare "cut where tasks could
+  each be tested alone" fires on nearly every chunk). Pre-mortem — a
+  replacement, reworded to match. Migration — the first triage called it a
+  replacement (drop the template shortcut); review showed that forces
+  `detail` mode where it does not fit — an `outlined` target, a
+  `roadmap.md` migration has not written yet, a higher tier — so it shipped
+  as the issue proposed it: an addition on both paths. Plan size gate —
+  *reword*: "more than one subsystem" fires on healthy chunks, file length
+  counts a file the reviewer never sees; one item in the existing gate
+  check, which leaves a `[?]` so `build` and `auto-chunk` refuse the chunk —
+  a "not build-ready" report alone stops nothing unattended. Build backstop
+  — *drop*: it fires after the work is done, and `pr-review` step 5 already
+  handles truncation.
+- **Lessons:** a blind re-run (the skill without this section) beat the
+  conversational triage by reading the code behind each claim. And triage
+  is not the last check: a "replacement" that saves a line can break the
+  surrounding skill, and a gate is only real if the next stage's gate reads
+  it. The PR review caught both.
