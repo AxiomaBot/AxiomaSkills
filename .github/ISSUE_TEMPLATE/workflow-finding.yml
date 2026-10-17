@@ -1,0 +1,122 @@
+name: Workflow finding
+description: A place where the agentic-workflow method let something through, diagnosed back to the skill text that allowed it.
+title: "[finding] "
+labels: ["workflow-finding"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        One finding per issue. The same evidence rules as the `retro` skill:
+        cite the PR and round, quote the actual wording, and name the stage
+        that should have caught it — never who missed it.
+
+        Filing is not a request for a change. Most findings stay open as
+        one-offs until a second one of the same class turns up; see
+        "Reporting a workflow finding" in the plugin README for the bar.
+
+  - type: input
+    id: project
+    attributes:
+      label: Project
+      description: The consuming repo or project where it happened.
+      placeholder: owner/repo
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Plugin version
+      description: >-
+        From `claude plugin list`, or `.claude-plugin/plugin.json` if the
+        plugin was loaded with `--plugin-dir`. With no commit pin, this is the
+        only way to know which version of a skill produced the run. Say so if
+        the run spanned a plugin change.
+      placeholder: "0.5.0"
+    validations:
+      required: true
+
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidence
+      description: >-
+        Links to the PR(s), the round, the reviewed head SHA, and the
+        reviewer's or the human's wording quoted verbatim.
+    validations:
+      required: true
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: The defect or failure, in a few sentences.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: stage
+    attributes:
+      label: Stage that should have caught it
+      options:
+        - roadmap
+        - plan
+        - build (implementation or self-review)
+        - quality reviewer
+        - security reviewer
+        - fix-review
+        - handoff
+        - auto-chunk (orchestration)
+        - checkpoint (manual tests)
+        - retro
+        - workflow (init / check)
+        - More than one — say which in the diagnosis
+        - Unclear
+    validations:
+      required: true
+
+  - type: textarea
+    id: diagnosis
+    attributes:
+      label: Diagnosis
+      description: >-
+        The mechanism: which skill, agent or template text allowed it, quoted,
+        and why that text produced this outcome.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: tag
+    attributes:
+      label: Class
+      description: The same tags as `docs/weak-spots.md`.
+      options:
+        - correctness
+        - data-integrity
+        - security
+    validations:
+      required: true
+
+  - type: input
+    id: cost
+    attributes:
+      label: Cost
+      description: Review rounds it cost, human interventions, whether the checkpoint found it.
+      placeholder: "2 rounds on chunk 3; found at checkpoint"
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed edit
+      description: >-
+        Optional. The file, the change, and the current lines it replaces,
+        quoted. A pure addition needs a stated reason why nothing could come
+        out to pay for it.
+
+  - type: textarea
+    id: related
+    attributes:
+      label: Related findings
+      description: >-
+        Optional. Links to earlier findings or retro reports of the same class.
+        Recurrence is what turns a finding into a change.
