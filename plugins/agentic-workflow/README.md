@@ -103,6 +103,11 @@ Three properties hold the whole thing together:
    **server-side** enforcement point — a config gate, a route guard, an opt-in
    checked in the service layer. UI concealment does not qualify, and the
    layout check rejects a line that names only a template or a nav change.
+   That gate, not the release, is what the checkpoint guards: the flow above
+   shows the default order, checklist then release, but a dark-shipped
+   feature may be released first when the project needs it — a deadline, a
+   checkpoint item that only exists in production. Which one your project
+   does belongs in `AGENTS.md` → Release model.
 3. **Features run in parallel on trunk.** Each feature owns its own folder, so
    two features touch disjoint files. Dependencies are *declared*
    (`depends-on: <feature>/<chunk>`), never stacked as branches, and the
@@ -348,7 +353,8 @@ Once `check` passes, cut the first feature into chunks and run one:
    when a checkpoint is reached — once per checkpoint, not per chunk.
 5. **Sign off and release**: mark the feature `done` in `feature.md` and
    `roadmap.md`, then trigger your project's release the way `AGENTS.md` →
-   Release model describes.
+   Release model describes. Sign-off is what opens the feature's `dark-ship`
+   gate; the release may already have happened.
 
 ---
 
@@ -490,7 +496,7 @@ your project is ever regenerated from here.
 | `templates/feature.md` | `docs/features/<slug>/feature.md` | Written by `roadmap detail` per feature, not by `init` itself |
 | `templates/chunk.md` | `docs/features/<slug>/chunks/<n>-<slug>.md` | Written by `plan` per chunk |
 | `templates/models.md` | `CLAUDE.md` → `## Models` | The tier table, floors and "go one up" triggers. **The only copy** — the skills and this README point here rather than restating it |
-| `templates/agents-sections.md` | appended to `AGENTS.md` | The three `##` headings read *by name* by the skills and both reviewer agents: Domain rules for code review, Release model, Weak spots. Most of the content is yours and grows over time, except `## Weak spots` in full and `## Release model`'s four floor bullets, which are fixed by the method — `tests/test_bundled_copies.py` pins `fixture/AGENTS.md`'s copy of those to this template |
+| `templates/agents-sections.md` | appended to `AGENTS.md` | The three `##` headings read *by name* by the skills and both reviewer agents: Domain rules for code review, Release model, Weak spots. Most of the content is yours and grows over time, except `## Weak spots` in full and `## Release model`'s three floor bullets, which are fixed by the method — `tests/test_bundled_copies.py` pins `fixture/AGENTS.md`'s copy of those to this template |
 | `templates/pr-guards.yml` | `.github/workflows/pr-guards.yml` | All three jobs, not just one: a gitleaks secret scan on the PR's own commits, the committed-permission-grant guard, and review coverage |
 | `templates/check_committed_permission_grants.py` | `scripts/` (run as `python3`) | Fails a PR whose tree contains **any** permission grant, in any tracked `.claude/settings*.json` at any depth: `allow`, `additionalDirectories`, a `defaultMode` other than `default`/`plan`, `enableAllProjectMcpServers`, or `enabledMcpjsonServers`. No base comparison — a grant that predates the workflow fails too, so there is nothing to grandfather in. Fails closed on a file it cannot read or parse. Stdlib-only, no `jq` |
 | `templates/check_review_coverage.sh` | `scripts/` (executable) | Fails a PR whose head has not had both review reports posted |
@@ -591,8 +597,9 @@ Who picks, and where it is recorded:
   that genuinely cannot ship dark may use a branch, and only one such feature
   may be in flight at a time.
 - **Releasing** is your project's own mechanism, described in `AGENTS.md` →
-  Release model, and it is the one thing the agents never do. Release only
-  after a checkpoint is signed off.
+  Release model, and it is the one thing the agents never do. By default,
+  release after a checkpoint is signed off; a feature still behind its
+  `dark-ship` gate may be released before it.
 
 ---
 

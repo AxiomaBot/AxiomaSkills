@@ -34,7 +34,6 @@ section by name).
   guard, an opt-in checked in the service layer. UI concealment alone does
   not qualify.
 - **One PR per chunk**, reviewed on its own head. A clean head is a stop.
-- **The human's manual checkpoint is the only gate before a release.**
 - Merging to `main` ships nothing. A `v*` tag is the only thing that does —
   in this fixture there is no deploy at all, which is the point: the release
   step is a no-op you can exercise safely.

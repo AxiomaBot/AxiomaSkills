@@ -26,7 +26,6 @@ must hold to — the game rules, not implementation notes.
   guard, an opt-in checked in the service layer. UI concealment alone does
   not qualify.
 - **One PR per chunk**, reviewed on its own head. A clean head is a stop.
-- **The human's manual checkpoint is the only gate before a release.**
 - <how this project actually ships: tag format, CI, deploy trigger>
 
 ---
