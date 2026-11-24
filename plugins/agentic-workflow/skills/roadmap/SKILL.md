@@ -113,7 +113,16 @@ The rolling-wave step — run when a feature is about to start, not before.
 5. **Write each chunk's spec block** (template below). The Invariants line is
    the most valuable line in this workflow: stated here, it is satisfied
    before review; unstated, the review finds it one round at a time.
-6. Pre-mortem, fix what it finds, create `docs/features/<slug>/`, write
+6. **Say what running each checkpoint will take.** One `Needs:` line under
+   each checkpoint: accounts and credentials, anything paid, real-world
+   events and their timing (a live match, a scheduled job), steps that only
+   exist after a release, and where it runs — local, or production behind
+   the `dark-ship` gate. Ask the user about anything that costs money, has a
+   deadline or is theirs to choose; a cost that first shows up when they sit
+   down to test is a planning miss. Name a credential and where the user gets
+   it, never its value — this line is committed. `local only` is a complete
+   answer.
+7. Pre-mortem, fix what it finds, create `docs/features/<slug>/`, write
    `feature.md` from `${CLAUDE_PLUGIN_ROOT}/templates/feature.md`, and flip
    the `roadmap.md` row to `planned` with its link.
 

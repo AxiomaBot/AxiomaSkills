@@ -26,4 +26,7 @@ checkpoint: <name, or a list when the feature has several>
 Run `manual_tests.md` in this folder once every chunk is merged. Signed off
 by: <human, date>.
 ### <Checkpoint name>
+- **Needs:** <what running it takes beyond a local checkout — accounts, paid
+  services, real-world events, steps that only exist after a release — and
+  where it runs; a credential is named, never its value; or: local only>
 - [ ] <manual assertion>

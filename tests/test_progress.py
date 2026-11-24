@@ -135,7 +135,7 @@ def test_the_fixture_reads_checkpoints_and_sign_off():
     foundation, widget = by_slug["demo-foundation"], by_slug["demo-widget"]
     assert [(c.ticked, c.total) for c in foundation.checkpoints] == [(2, 2)]
     assert foundation.signed_off == "fixture author, 2026-09-18"
-    assert [(c.ticked, c.total) for c in widget.checkpoints] == [(0, 2)]
+    assert [(c.ticked, c.total) for c in widget.checkpoints] == [(0, 1)]
     assert widget.signed_off is None
 
 

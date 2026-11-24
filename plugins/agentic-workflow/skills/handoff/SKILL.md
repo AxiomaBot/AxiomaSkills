@@ -24,8 +24,15 @@ chunk has nothing to hand off.
    landed. Skim the code so the steps match reality.
 2. **Fold the Manual test steps into `manual_tests.md`.** Create it from the
    template below if absent. The file reads like a tester's plan for the whole
-   feature — organised by checkpoint, then by user flow, converged to
+   feature — organised by checkpoint, then by session (the items that can
+   be run in one sitting because they need the same things), converged to
    final-state assertions — not a log of what each chunk produced:
+   - A chunk whose steps are `None — <why>` adds no item.
+   - An item goes under the session its `Needs:` line names; one with no
+     `Needs:` line goes in the default-setup session, which comes first. The
+     session heading states what it needs, once, and is the only record of
+     why an item sits there: the item's own `Needs:` line is not copied in.
+     A credential is named in the heading, never written out.
    - A flow several chunks touched gets **one** item asserting the final
      behaviour; superseded intermediate checks go.
    - "Still loads / unaffected" appears once per flow, not once per chunk.
@@ -63,11 +70,30 @@ chunk has nothing to hand off.
    bookkeeping exists to prevent, and nothing mechanical catches it: the
    layout check only tests that the two files agree, and they would both be
    wrong together. Their already-checked items stay checked.
-5. **Report.** Which checklist items were added, converged or collapsed;
+5. **Make the checkpoint runnable** — only when this chunk is the last one
+   feeding its checkpoint: every chunk the feature file puts in that
+   checkpoint's range now has all its boxes ticked. For a feature with one
+   checkpoint that is when the status just went to `built`; when the feature
+   file does not say which chunks feed which checkpoint, wait for `built`.
+   Until then no one can see the whole list. Read that
+   checkpoint's items together, against its `Needs:` line in the feature
+   file:
+   - Order the sessions by what they take to arrange: default setup first,
+     then credentials, then anything that waits on the real world or on a
+     release.
+   - Every item's starting state is stated and reachable from its session's
+     setup. Two items that need the same record, account or fixture in
+     different states each get their own, named in the steps.
+   - A need the feature file's `Needs:` line does not declare is a cost the
+     human has not agreed to: name it in the report.
+   This step reorders and completes; it never drops an item, and it never
+   decides where to test, what to pay for or what to skip — those go in the
+   report as questions.
+6. **Report.** Which checklist items were added, converged or collapsed;
    which boxes were ticked and which deliberately not; the status transition
-   if any. Remind the reader that the checklist is run once, as a batch, when
-   the checkpoint is reached — not now — and that marking the feature `done`
-   is theirs.
+   if any; what step 5 found, when it ran. Remind the reader that the
+   checklist is run session by session when the checkpoint is reached — not
+   now — and that marking the feature `done` is theirs.
 
 ## Template
 
@@ -75,13 +101,13 @@ chunk has nothing to hand off.
 # Manual tests — <feature name>
 
 > **When to run:** once every chunk in a checkpoint's range is merged and CI
-> is green.
+> is green, one session at a time, in the order below.
 >
-> **Setup:** <env / seed steps, how to run the app>
+> **Setup:** <the default: env / seed steps, how to run the app>
 
 ## <Checkpoint name>
 
-### <Flow>
+### <Session — what it needs, e.g. "Local, no credentials">
 - [ ] **<short title>** (<chunk tag>)
   - Steps: <exact clicks / commands / URLs / inputs>
   - Expected: <observable result>

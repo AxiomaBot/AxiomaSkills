@@ -37,7 +37,9 @@ Expose the stored widgets to a demo caller through `demo_list()`, gated by
 
 ## Test strategy
 
-- Automated: one check per invariant, the gate-off case written first.
+- Automated: one check per invariant, the gate-off case written first. The
+  gate-on round trip and the gate-off refusal are these checks, which is why
+  neither is a manual item below.
   The stub test command in `CLAUDE.md` → Commands always passes, so in this
   fixture "the tests are green" proves the plumbing, not the code.
 - Verify: with the demo gate off and the store gate on, `demo_list()` returns
@@ -45,12 +47,12 @@ Expose the stored widgets to a demo caller through `demo_list()`, gated by
 
 ## Manual test steps
 
-- [ ] **Both gates on, the demo list shows the widgets** (1)
-  - Steps: `python -c "import src.widgets as w; w.set_gate(True); w.set_demo(True); w.add_widget('a','ada'); print(w.demo_list())"`
-  - Expected: one widget named `a` is printed
-- [ ] **Demo gate off, the demo list is empty** (1)
-  - Steps: same, with `w.set_demo(False)`
-  - Expected: an empty list, even though the store gate is on
+- [ ] **The demo list shows only what a demo visitor should see** (1)
+  - Steps: from `fixture/`, with nothing stored yet, run
+    `python -c "import src.widgets as w; w.set_gate(True); w.set_demo(True); w.add_widget('kettle','ada'); w.add_widget('lamp','grace'); print(w.demo_list())"`
+    and read the output as a visitor who owns neither widget.
+  - Expected: you are content for that visitor to see every name and owner
+    printed. Anything you would rather keep private is a failure.
 
 ## Open questions
 
