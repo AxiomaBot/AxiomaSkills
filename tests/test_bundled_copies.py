@@ -224,3 +224,7 @@ def test_the_release_model_floor_rules_are_pinned_to_their_template():
         "the project's own deploy-trigger bullet) have drifted from "
         "templates/agents-sections.md"
     )
+    # The checkpoint-before-release rule was removed on purpose; `startswith`
+    # alone would let it come back after the fixed bullets.
+    for text in (template_body, fixture_text):
+        assert "only gate before a release" not in text

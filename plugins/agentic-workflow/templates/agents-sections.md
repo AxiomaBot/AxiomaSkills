@@ -24,7 +24,9 @@ must hold to — the game rules, not implementation notes.
   users until its checkpoint is signed off. The feature file's `dark-ship`
   line names the **server-side** enforcement point — a config gate, a route
   guard, an opt-in checked in the service layer. UI concealment alone does
-  not qualify.
+  not qualify. A release before sign-off is safe only while that gate is
+  closed; a feature on a feature branch has no gate and stays unmerged until
+  its checkpoint is signed off.
 - **One PR per chunk**, reviewed on its own head. A clean head is a stop.
 - <how this project actually ships: tag format, CI, deploy trigger>
 

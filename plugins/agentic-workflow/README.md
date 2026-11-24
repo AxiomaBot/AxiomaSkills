@@ -104,10 +104,14 @@ Three properties hold the whole thing together:
    checked in the service layer. UI concealment does not qualify, and the
    layout check rejects a line that names only a template or a nav change.
    That gate, not the release, is what the checkpoint guards: the flow above
-   shows the default order, checklist then release, but a dark-shipped
-   feature may be released first when the project needs it — a deadline, a
-   checkpoint item that only exists in production. Which one your project
-   does belongs in `AGENTS.md` → Release model.
+   shows the default order, checklist then release, but a feature whose gate
+   is still closed may be released first when the project needs it — a
+   deadline, a checkpoint item that only exists in production. A feature on
+   a feature branch has no gate, so it stays unmerged until sign-off. Which
+   order your project uses belongs in `AGENTS.md` → Release model. (A
+   project set up before 0.7.1 still has the bullet "The human's manual
+   checkpoint is the only gate before a release" there; delete it by hand if
+   you want the early release.)
 3. **Features run in parallel on trunk.** Each feature owns its own folder, so
    two features touch disjoint files. Dependencies are *declared*
    (`depends-on: <feature>/<chunk>`), never stacked as branches, and the
@@ -353,8 +357,8 @@ Once `check` passes, cut the first feature into chunks and run one:
    when a checkpoint is reached — once per checkpoint, not per chunk.
 5. **Sign off and release**: mark the feature `done` in `feature.md` and
    `roadmap.md`, then trigger your project's release the way `AGENTS.md` →
-   Release model describes. Sign-off is what opens the feature's `dark-ship`
-   gate; the release may already have happened.
+   Release model describes. Sign-off is the point at which you open the
+   feature's `dark-ship` gate; the release may already have happened.
 
 ---
 
