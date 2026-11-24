@@ -57,7 +57,7 @@ chunk has nothing to hand off.
 4. **Set the status.** In the feature file's frontmatter and the matching
    `roadmap.md` row: `planned` → `building` when this is the first chunk to
    land; `building` → `built` when every chunk's boxes are now all ticked.
-   Never `done` — that is the human's, at sign-off, together with the tag.
+   Never `done` — that is the human's, at sign-off.
    **The one way a status moves backwards:** new unchecked items landing in a
    feature the human already signed off. `done` → `built` then, in both
    places at once — and in `roadmap.md` that means **moving the row out of

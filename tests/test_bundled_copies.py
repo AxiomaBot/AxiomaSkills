@@ -10,7 +10,7 @@ Two kinds of duplication are unavoidable here and one is not:
 * `fixture/` is a real consuming project, so it legitimately holds its own
   copy of what `init` wrote into it -- both the tier table (`CLAUDE.md`) and
   the two fixed sections of `templates/agents-sections.md` that never vary by
-  project (`## Weak spots` in full; `## Release model`'s four floor bullets,
+  project (`## Weak spots` in full; `## Release model`'s three floor bullets,
   everything but the project's own deploy-trigger line). Pinned, not
   eliminated. This is also where the fixture's own `## Release model` bullet
   drifted from the template by one clause before this file existed to catch
@@ -197,7 +197,7 @@ def test_the_weak_spots_section_is_pinned_to_its_template():
 
 
 def test_the_release_model_floor_rules_are_pinned_to_their_template():
-    """The four floor rules under `## Release model` never vary by project --
+    """The three floor rules under `## Release model` never vary by project --
     only the closing "how this project actually ships" bullet does.
     """
     wc = _load_workflow_check()
@@ -224,3 +224,7 @@ def test_the_release_model_floor_rules_are_pinned_to_their_template():
         "the project's own deploy-trigger bullet) have drifted from "
         "templates/agents-sections.md"
     )
+    # The checkpoint-before-release rule was removed on purpose; `startswith`
+    # alone would let it come back after the fixed bullets.
+    for text in (template_body, fixture_text):
+        assert "only gate before a release" not in text

@@ -32,9 +32,10 @@ section by name).
   users until its checkpoint is signed off. The feature file's `dark-ship`
   line names the **server-side** enforcement point — a config gate, a route
   guard, an opt-in checked in the service layer. UI concealment alone does
-  not qualify.
+  not qualify. A release before sign-off is safe only while that gate is
+  closed; a feature on a feature branch has no gate and stays unmerged until
+  its checkpoint is signed off.
 - **One PR per chunk**, reviewed on its own head. A clean head is a stop.
-- **The human's manual checkpoint is the only gate before a release.**
 - Merging to `main` ships nothing. A `v*` tag is the only thing that does —
   in this fixture there is no deploy at all, which is the point: the release
   step is a no-op you can exercise safely.
