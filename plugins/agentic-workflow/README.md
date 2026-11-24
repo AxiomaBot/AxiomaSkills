@@ -620,8 +620,9 @@ Who picks, and where it is recorded:
   one HTML page with what shipped, what can be built now and in parallel,
   checkpoint progress and what waits on what, ending at `<target>` (e.g. the go-live
   feature). Read-only; the page goes to a temp path or an artifact.
-- **Checkpoint reached:** run `docs/features/<slug>/manual_tests.md` top to
-  bottom, and report failures by item title or chunk tag.
+- **Checkpoint reached:** run `docs/features/<slug>/manual_tests.md` one
+  session at a time, in the order the file gives, and report failures by
+  item title or chunk tag.
 - **You spot a bug mid-anything:** don't chase it — ask for it to be appended
   to `docs/deferred.md`; `plan` offers it back at the right chunk.
 - **The method itself let something through:** file a

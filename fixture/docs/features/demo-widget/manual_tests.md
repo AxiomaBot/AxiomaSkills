@@ -1,8 +1,8 @@
 # Manual tests — demo-widget
 
 The checkpoint checklist for this feature, folded in one chunk at a time by
-the `handoff` skill. Final-state assertions, not a per-chunk log. Run it top
-to bottom once every chunk is merged.
+the `handoff` skill. Final-state assertions, not a per-chunk log. Run it
+once every chunk is merged.
 
 ## A demo caller sees the widget list, and only behind the gate
 

@@ -24,10 +24,17 @@
 - Verify: <the one runtime behaviour /verify exercises, from the spec>
 
 ## Manual test steps
-(what /handoff folds into the feature's manual_tests.md, under the
-checkpoint this chunk feeds; upgrade-only checks marked as such)
+(only what needs a human: their judgement, the physical world, or an account
+or machine only they have — written for the tester, in the product's words.
+A result a command can check is an automated test above, not an item here.
+`None — <why>` when nothing needs a human. /handoff folds these into the
+feature's manual_tests.md, under the checkpoint this chunk feeds;
+upgrade-only checks marked as such)
 - [ ] **<title>** (<n>)
-  - Steps: <exact clicks / commands / URLs / inputs>
+  - Needs: <only when it takes more than the default setup — a credential,
+    production, a real-world event>
+  - Steps: <the starting state and how to reach it, then the exact clicks /
+    commands / URLs / inputs>
   - Expected: <observable result>
 
 ## Open questions

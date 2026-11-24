@@ -113,9 +113,17 @@ unstated is what the reviewers find, one round at a time.
 7. **Write the chunk file** to
    `docs/features/<feature>/chunks/<n>-<slug>.md`, from
    `${CLAUDE_PLUGIN_ROOT}/templates/chunk.md`, overwriting a previous plan
-   for the same chunk.
+   for the same chunk. **Manual test steps are only what needs a human** —
+   their judgement, the physical world, or an account or machine only they
+   have — written for the tester in the product's words, not the code's.
+   A check whose result a command can read is an automated test: it comes
+   off the list only when Test strategy names the test that covers it. Each
+   step starts from a stated state and says how to reach it, and carries a
+   `Needs:` line when it takes more than the default setup. A chunk with
+   nothing for a human says `None — <why>`.
 8. **Gate check.** No `[?]`; Invariants populated or literally `None — <why>`
-   (a chunk with no runtime surface); Manual test steps present; `Build
+   (a chunk with no runtime surface); Manual test steps present or literally
+   `None — <why>`, none of them a check a command could make; `Build
    model:` line present; the task list still meets the `roadmap` skill's
    `detail` step-4 size rule. A plan is where a chunk grows, and the roadmap
    never sees it: a chunk that has outgrown the rule gets the line
