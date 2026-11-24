@@ -28,5 +28,5 @@ by: <human, date>.
 ### <Checkpoint name>
 - **Needs:** <what running it takes beyond a local checkout — accounts, paid
   services, real-world events, steps that only exist after a release — and
-  where it runs; or: local only>
+  where it runs; a credential is named, never its value; or: local only>
 - [ ] <manual assertion>

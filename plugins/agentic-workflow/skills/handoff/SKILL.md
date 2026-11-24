@@ -30,7 +30,9 @@ chunk has nothing to hand off.
    - A chunk whose steps are `None — <why>` adds no item.
    - An item goes under the session its `Needs:` line names; one with no
      `Needs:` line goes in the default-setup session, which comes first. The
-     session heading states what it needs, once.
+     session heading states what it needs, once, and is the only record of
+     why an item sits there: the item's own `Needs:` line is not copied in.
+     A credential is named in the heading, never written out.
    - A flow several chunks touched gets **one** item asserting the final
      behaviour; superseded intermediate checks go.
    - "Still loads / unaffected" appears once per flow, not once per chunk.
@@ -69,8 +71,11 @@ chunk has nothing to hand off.
    layout check only tests that the two files agree, and they would both be
    wrong together. Their already-checked items stay checked.
 5. **Make the checkpoint runnable** — only when this chunk is the last one
-   feeding its checkpoint (for a feature with one checkpoint, when the status
-   just went to `built`). Until then no one can see the whole list. Read that
+   feeding its checkpoint: every chunk the feature file puts in that
+   checkpoint's range now has all its boxes ticked. For a feature with one
+   checkpoint that is when the status just went to `built`; when the feature
+   file does not say which chunks feed which checkpoint, wait for `built`.
+   Until then no one can see the whole list. Read that
    checkpoint's items together, against its `Needs:` line in the feature
    file:
    - Order the sessions by what they take to arrange: default setup first,

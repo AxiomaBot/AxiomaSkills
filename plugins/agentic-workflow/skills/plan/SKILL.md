@@ -116,11 +116,14 @@ unstated is what the reviewers find, one round at a time.
    for the same chunk. **Manual test steps are only what needs a human** —
    their judgement, the physical world, or an account or machine only they
    have — written for the tester in the product's words, not the code's.
-   A check whose result a command can read is an automated test: it comes
-   off the list only when Test strategy names the test that covers it. Each
+   A check whose result a command can read is an automated test: add it
+   to Tasks and name it under Test strategy, and only then does it come off
+   the list. One no test here can make — it needs production, a paid
+   account, a real event — stays a manual item. Each
    step starts from a stated state and says how to reach it, and carries a
-   `Needs:` line when it takes more than the default setup. A chunk with
-   nothing for a human says `None — <why>`.
+   `Needs:` line when it takes more than the default setup; a credential is
+   named there, never written out. A chunk with nothing for a human says
+   `None — <why>`.
 8. **Gate check.** No `[?]`; Invariants populated or literally `None — <why>`
    (a chunk with no runtime surface); Manual test steps present or literally
    `None — <why>`, none of them a check a command could make; `Build

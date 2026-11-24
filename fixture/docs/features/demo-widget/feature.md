@@ -48,6 +48,6 @@ by: <human, date>.
 
 ### A demo caller sees the widget list, and only behind the gate
 
-- [ ] With both gates on, the demo list shows the stored widgets
-- [ ] With the demo gate off, the demo list is empty even though the store
-      gate is on
+- **Needs:** local only
+- [ ] The demo list shows a visitor nothing the owners would want kept
+      private

@@ -31,8 +31,8 @@ A result a command can check is an automated test above, not an item here.
 feature's manual_tests.md, under the checkpoint this chunk feeds;
 upgrade-only checks marked as such)
 - [ ] **<title>** (<n>)
-  - Needs: <only when it takes more than the default setup — a credential,
-    production, a real-world event>
+  - Needs: <only when it takes more than the default setup — a credential
+    (named, never its value), production, a real-world event>
   - Steps: <the starting state and how to reach it, then the exact clicks /
     commands / URLs / inputs>
   - Expected: <observable result>
